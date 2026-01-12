@@ -41,7 +41,7 @@ export default function Stage3Results({ commonSpecs, buyerISQs }: Stage3ResultsP
             </div>
           </div>
           <p className="text-sm text-blue-700 mb-6">
-            True overlap between Stage 1 and Stage 2 specifications
+            Specifications that appear in both Stage 1 & Stage 2
           </p>
 
           <div className="max-h-[600px] overflow-y-auto pr-2">
@@ -106,7 +106,7 @@ export default function Stage3Results({ commonSpecs, buyerISQs }: Stage3ResultsP
             </h3>
           </div>
           <p className="text-sm text-amber-700 mb-6">
-            Top 2 common specs enhanced with additional Stage 1 options (max 8 per spec)
+           Bases on Seller Specs & Website Benchmarking
           </p>
 
           <div className="max-h-[600px] overflow-y-auto pr-2">
