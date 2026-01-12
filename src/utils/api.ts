@@ -1072,7 +1072,7 @@ INSTRUCTIONS:
 3. Select 1 CONFIG specification IF FOUND (highest frequency, most price-affecting)
 4. Select UP TO 3 KEY specifications IF FOUND (next highest frequency)
 5. Options must be the ones most repeated across URLs
-6. Maximum 8 options per Config, 6 per Key
+6. Maximum 8 options per specification
 7. If you cannot find enough relevant specs, output what you find (don't make up specs)
 
 OUTPUT FORMAT:
