@@ -1652,7 +1652,7 @@ export async function generateBuyerISQsWithGemini(
 
     if (!stage1Spec) {
       console.log(`   No matching Stage 1 spec found, using common options only`);
-      const finalOptions = deduplicateOptions(commonOptions).slice(0, 8);
+      const finalOptions = cleanBuyerISQOptions(commonOptions).slice(0, 8);
       buyerISQs.push({
         name: commonSpec.spec_name,
         options: finalOptions
