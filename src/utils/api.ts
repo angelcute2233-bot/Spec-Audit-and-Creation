@@ -1452,6 +1452,7 @@ IMPORTANT INSTRUCTIONS:
    - Use the category from Stage 1 (Primary/Secondary)
    - Find ALL common options between the two stages
    - If NO common options, show empty options list
+   - You MUST return the option **exactly as it appears in the Stage 1 list**
 
 OUTPUT FORMAT (PLAIN TEXT TABLE):
 Specification Name | Stage 1 Category | Common Options
