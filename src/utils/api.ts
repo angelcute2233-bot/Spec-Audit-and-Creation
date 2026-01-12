@@ -1465,6 +1465,32 @@ IMPORTANT INSTRUCTIONS:
    - If one stage has options **range** (e.g., "1-5 mm") and the other stage has **discrete numbers** (e.g., "1 mm, 2 mm, 3 mm"), treat all discrete numbers that fall within the range as common options
    - You MUST return the common options in format **exactly as it appears in the Stage 1 list**
 
+CRITICAL RANGE HANDLING FOR COMMON OPTIONS:
+1. If Stage 2 has a RANGE (e.g., "0.14-2.00 mm") and Stage 1 has SPECIFIC NUMBERS (e.g., "0.5 mm", "1.0 mm", "1.5 mm"):
+   - Extract ALL specific numbers from Stage 1 that fall WITHIN the Stage 2 range
+   - Example: Stage 2: "0.14-2.00 mm", Stage 1: ["0.5 mm", "1.0 mm", "1.5 mm", "2.5 mm"]
+     → Common options: "0.5 mm", "1.0 mm", "1.5 mm", "2.0 mm" (all within 0.14-2.00 mm)
+     → "2.5 mm" is NOT included (outside range)
+   
+2. If Stage 1 has a RANGE and Stage 2 has SPECIFIC NUMBERS:
+   - Apply the same logic in reverse
+   
+3. If BOTH have RANGES:
+   - Find the OVERLAPPING portion
+   - Example: Stage 1: "0.5-1.5 mm", Stage 2: "1.0-2.0 mm"
+     → Common range: "1.0-1.5 mm"
+     → Report as: "1.0-1.5 mm"
+
+4. For mixed units (mm, cm, inches):
+   - Convert ALL to a common unit (prefer mm) before comparing
+   - 1 inch = 25.4 mm, 1 cm = 10 mm
+
+
+5. If Stage 2 has multiple overlapping ranges (like "0.14-2.00 mm" and "0.25-2.00 mm"):
+   - Consider the WIDER range ("0.14-2.00 mm") for comparison
+   - Remove redundant narrower ranges
+
+   
 OUTPUT FORMAT (PLAIN TEXT TABLE):
 Specification Name | Stage 1 Category | Common Options
 Grade | Primary | 304, 316, 430
