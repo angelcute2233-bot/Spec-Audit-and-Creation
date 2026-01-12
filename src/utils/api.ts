@@ -1091,153 +1091,6 @@ CRITICAL: Output ONLY the formatted specifications. No explanations, no apologie
 `;
 }
 
-// Rest of the functions remain EXACTLY THE SAME (unchanged)
-export function generateBuyerISQsFromSpecs(
-  uploadedSpecs: { spec_name: string; options: string[]; tier?: string }[],
-  stage2ISQs: { config: ISQ; keys: ISQ[] }
-): ISQ[] {
-  console.log('🛒 Generating Buyer ISQs from uploaded specs...');
-  console.log('Uploaded specs:', uploadedSpecs.length);
-  console.log('Stage 2 ISQs:', stage2ISQs.config ? 1 : 0, 'config +', stage2ISQs.keys.length, 'keys');
-
-  // Combine all Stage 2 ISQs
-  const allStage2ISQs: ISQ[] = [];
-  if (stage2ISQs.config && stage2ISQs.config.name && stage2ISQs.config.options?.length > 0) {
-    allStage2ISQs.push(stage2ISQs.config);
-  }
-  if (stage2ISQs.keys && stage2ISQs.keys.length > 0) {
-    allStage2ISQs.push(...stage2ISQs.keys.filter(k => k.name && k.options?.length > 0));
-  }
-
-  // Find common specs
-  const commonSpecs: Array<{
-    name: string;
-    options: string[];
-    priority: number;
-  }> = [];
-
-  uploadedSpecs.forEach(uploadedSpec => {
-    allStage2ISQs.forEach(stage2ISQ => {
-      if (isSemanticallySimilar(uploadedSpec.spec_name, stage2ISQ.name)) {
-        const commonOptions = findCommonOptions(uploadedSpec.options, stage2ISQ.options);
-
-        const priority = uploadedSpec.tier === 'Primary' ? 3 : 2;
-
-        if (commonOptions.length > 0) {
-          commonSpecs.push({
-            name: uploadedSpec.spec_name,
-            options: commonOptions,
-            priority
-          });
-        }
-      }
-    });
-  });
-
-  console.log('Common specs found:', commonSpecs.length);
-
-  if (commonSpecs.length === 0) {
-    console.log('⚠️ No common specs found');
-    return [];
-  }
-
-  // Sort by priority
-  commonSpecs.sort((a, b) => b.priority - a.priority);
-
-  // Return top 2
-  const buyerISQs = commonSpecs.slice(0, 2).map(spec => ({
-    name: spec.name,
-    options: spec.options.slice(0, 8)
-  }));
-
-  console.log('✅ Generated buyer ISQs:', buyerISQs.length);
-  return buyerISQs;
-}
-
-function getOptimizedBuyerISQOptions(
-  stage1Options: string[], 
-  stage2Options: string[],
-  normName: string
-): string[] {
-  console.log(`🔧 Getting optimized options for: "${normName}"`);
-  console.log(`   Stage 1 options:`, stage1Options);
-  console.log(`   Stage 2 options:`, stage2Options);
-
-  const result: string[] = [];
-  const seen = new Set<string>();
-
-  // Step 1: Add EXACT matches first
-  console.log('   Step 1: Adding exact matches...');
-  for (const opt1 of stage1Options) {
-    if (result.length >= 8) break;
-    
-    const cleanOpt1 = opt1.trim().toLowerCase();
-    const exactMatch = stage2Options.find(opt2 => 
-      opt2.trim().toLowerCase() === cleanOpt1
-    );
-    
-    if (exactMatch && !seen.has(cleanOpt1)) {
-      result.push(opt1);
-      seen.add(cleanOpt1);
-      console.log(`     ✅ Exact match: "${opt1}"`);
-    }
-  }
-
-  // Step 2: Add STRONG semantic matches
-  if (result.length < 8) {
-    console.log('   Step 2: Adding strong semantic matches...');
-    for (const opt1 of stage1Options) {
-      if (result.length >= 8) break;
-      
-      const cleanOpt1 = opt1.trim().toLowerCase();
-      if (seen.has(cleanOpt1)) continue;
-      
-      for (const opt2 of stage2Options) {
-        if (result.length >= 8) break;
-        
-        if (areOptionsStronglySimilar(opt1, opt2) && !seen.has(cleanOpt1)) {
-          result.push(opt1);
-          seen.add(cleanOpt1);
-          console.log(`     ✅ Strong match: "${opt1}" ↔ "${opt2}"`);
-          break;
-        }
-      }
-    }
-  }
-
-  // Step 3: Add remaining Stage 1 options (most relevant)
-  if (result.length < 8) {
-    console.log('   Step 3: Adding remaining Stage 1 options...');
-    const remainingStage1 = stage1Options.filter(opt => {
-      const cleanOpt = opt.trim().toLowerCase();
-      return !seen.has(cleanOpt);
-    });
-    
-    // Take top options (max 8 total)
-    const toAdd = Math.min(8 - result.length, remainingStage1.length);
-    for (let i = 0; i < toAdd; i++) {
-      result.push(remainingStage1[i]);
-      seen.add(remainingStage1[i].trim().toLowerCase());
-      console.log(`     ➕ Stage 1: "${remainingStage1[i]}"`);
-    }
-  }
-
-  // Step 5: Ensure no duplicates in final result
-  const finalResult: string[] = [];
-  const finalSeen = new Set<string>();
-  
-  for (const opt of result) {
-    const cleanOpt = opt.trim().toLowerCase();
-    if (!finalSeen.has(cleanOpt)) {
-      finalResult.push(opt);
-      finalSeen.add(cleanOpt);
-    }
-  }
-
-  console.log(`   ✅ Final: ${finalResult.length} unique options`);
-  return finalResult.slice(0, 8);
-}
-
 function areOptionsStronglySimilar(opt1: string, opt2: string): boolean {
   if (!opt1 || !opt2) return false;
   
@@ -1673,78 +1526,197 @@ function findCommonSpecsLocally(
   return commonSpecs;
 }
 
-// SIMPLE: Get Buyer ISQs - First 2 from Common Specifications
-export function selectStage3BuyerISQs(
+export async function generateBuyerISQsWithGemini(
   commonSpecs: Array<{ spec_name: string; options: string[]; category: string }>,
   stage1Specs: { spec_name: string; options: string[]; tier?: string }[]
-): ISQ[] {
-  console.log('🔍 Creating Buyer ISQs from Common Specifications...');
-  
+): Promise<ISQ[]> {
+  console.log('🚀 Stage 3: Generating Buyer ISQs with Gemini...');
+
   if (commonSpecs.length === 0) {
     console.log('⚠️ No common specs, no buyer ISQs');
     return [];
   }
-  
-  // Take first 2 specs from commonSpecs
+
   const topSpecs = commonSpecs.slice(0, 2);
-  console.log(`📦 Taking first ${topSpecs.length} specs for Buyer ISQs`);
-  
+  console.log(`📦 Taking first ${topSpecs.length} common specs for Buyer ISQs`);
+
   const buyerISQs: ISQ[] = [];
-  
-  topSpecs.forEach(spec => {
-    console.log(`\n🔧 Processing Buyer ISQ: ${spec.spec_name}`);
-    
-    // Step 1: Start with common options (remove "No common options available")
-    let finalOptions = spec.options.filter(opt => 
+
+  for (const commonSpec of topSpecs) {
+    console.log(`\n🔧 Processing Buyer ISQ: ${commonSpec.spec_name}`);
+
+    const commonOptions = commonSpec.options.filter(opt =>
       !opt.toLowerCase().includes('no common options available')
     );
-    
-    console.log(`   Common options: ${finalOptions.length}`);
-    
-    // Step 2: Get matching Stage 1 spec
-    const stage1Spec = stage1Specs.find(s => 
-      s.spec_name === spec.spec_name
+
+    console.log(`   Common options count: ${commonOptions.length}`);
+
+    const stage1Spec = stage1Specs.find(s =>
+      s.spec_name === commonSpec.spec_name ||
+      isSemanticallySimilar(s.spec_name, commonSpec.spec_name)
     );
-    
-    if (stage1Spec) {
-      console.log(`   Found Stage 1 spec with ${stage1Spec.options.length} options`);
-      
-      // Step 3: Add ALL options from Stage 1 (but remove duplicates)
-      stage1Spec.options.forEach(option => {
-        const lowerOption = option.trim().toLowerCase();
-        const alreadyExists = finalOptions.some(existing => 
-          existing.trim().toLowerCase() === lowerOption
-        );
-        
-        if (!alreadyExists && finalOptions.length < 8) {
-          finalOptions.push(option);
-        }
+
+    if (!stage1Spec) {
+      console.log(`   No matching Stage 1 spec found, using common options only`);
+      buyerISQs.push({
+        name: commonSpec.spec_name,
+        options: commonOptions.slice(0, 8)
       });
-    } else {
-      console.log(`   No matching Stage 1 spec found`);
+      continue;
     }
-    
-    // Step 4: Ensure max 8 options
-    finalOptions = finalOptions.slice(0, 8);
-    
-    // Step 5: If still no options, add a placeholder
-    if (finalOptions.length === 0) {
-      console.log(`   Still no options, adding placeholder`);
-      finalOptions = ["Options not available"];
+
+    console.log(`   Found Stage 1 spec with ${stage1Spec.options.length} options`);
+
+    if (commonOptions.length >= 8) {
+      console.log(`   Already have 8+ common options, using first 8`);
+      buyerISQs.push({
+        name: commonSpec.spec_name,
+        options: commonOptions.slice(0, 8)
+      });
+      continue;
     }
-    
-    console.log(`   ✅ Final: ${finalOptions.length} options`);
-    
+
+    console.log(`   Need more options (have ${commonOptions.length}), calling Gemini...`);
+
+    const enhancedOptions = await enhanceOptionsWithGemini(
+      commonSpec.spec_name,
+      commonOptions,
+      stage1Spec.options,
+      8 - commonOptions.length
+    );
+
+    const finalOptions = [...commonOptions, ...enhancedOptions].slice(0, 8);
+
+    console.log(`   ✅ Final: ${finalOptions.length} options (${commonOptions.length} common + ${enhancedOptions.length} from Stage 1)`);
+
     buyerISQs.push({
-      name: spec.spec_name,
+      name: commonSpec.spec_name,
       options: finalOptions
     });
-  });
-  
-  console.log(`🎉 Created ${buyerISQs.length} Buyer ISQs`);
+  }
+
+  console.log(`\n🎉 Generated ${buyerISQs.length} Buyer ISQs`);
   buyerISQs.forEach((isq, i) => {
     console.log(`  ${i+1}. ${isq.name}: ${isq.options.length} options`);
   });
-  
+
   return buyerISQs;
+}
+
+async function enhanceOptionsWithGemini(
+  specName: string,
+  commonOptions: string[],
+  stage1Options: string[],
+  neededCount: number
+): Promise<string[]> {
+  if (!STAGE3_API_KEY) {
+    console.warn('⚠️ Stage 3 API key not configured, using local fallback');
+    return enhanceOptionsLocally(commonOptions, stage1Options, neededCount);
+  }
+
+  const prompt = `You are an AI that intelligently selects the most relevant product specification options.
+
+SPECIFICATION NAME: "${specName}"
+
+EXISTING OPTIONS (already selected):
+${commonOptions.map((opt, i) => `${i + 1}. ${opt}`).join('\n')}
+
+AVAILABLE STAGE 1 OPTIONS (to choose from):
+${stage1Options.map((opt, i) => `${i + 1}. ${opt}`).join('\n')}
+
+TASK:
+Select exactly ${neededCount} options from the Stage 1 options to add to the existing options.
+
+CRITICAL RULES:
+1. DO NOT select any option that is already in the existing options
+2. DO NOT select options that are semantically the same as existing options
+3. Select the MOST RELEVANT and COMMONLY USED options for "${specName}"
+4. Prefer options that are industry-standard or widely used
+5. Select exactly ${neededCount} options (no more, no less)
+6. If fewer than ${neededCount} unique options are available, return as many as possible
+
+EXAMPLES OF SEMANTIC DUPLICATES (DO NOT SELECT):
+- If "304" exists, don't select "SS304", "ss304", "Stainless Steel 304"
+- If "2mm" exists, don't select "2 mm", "2.0mm"
+- If "Polished" exists, don't select "Polish", "Polished Finish"
+
+OUTPUT FORMAT (JSON ONLY):
+{
+  "selected_options": ["option1", "option2", "option3"]
+}
+
+Return ONLY valid JSON, no explanations.`;
+
+  try {
+    console.log(`📡 Calling Gemini to select ${neededCount} additional options...`);
+    const response = await fetchWithRetry(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${STAGE3_API_KEY}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.2,
+            maxOutputTokens: 2048,
+            responseMimeType: "application/json"
+          }
+        })
+      },
+      2,
+      10000
+    );
+
+    const data = await response.json();
+    const result = extractJSONFromGemini(data);
+
+    if (result && result.selected_options && Array.isArray(result.selected_options)) {
+      const validOptions = result.selected_options
+        .filter(opt => typeof opt === 'string' && opt.trim().length > 0)
+        .filter(opt => !isOptionDuplicate(opt, commonOptions))
+        .slice(0, neededCount);
+
+      console.log(`✅ Gemini selected ${validOptions.length} additional options`);
+      return validOptions;
+    }
+
+    console.warn('⚠️ Gemini returned invalid data, using local fallback');
+    return enhanceOptionsLocally(commonOptions, stage1Options, neededCount);
+
+  } catch (error) {
+    console.error('❌ Gemini API error:', error);
+    return enhanceOptionsLocally(commonOptions, stage1Options, neededCount);
+  }
+}
+
+function enhanceOptionsLocally(
+  commonOptions: string[],
+  stage1Options: string[],
+  neededCount: number
+): string[] {
+  console.log(`🔄 Using local enhancement (need ${neededCount} options)`);
+
+  const additionalOptions: string[] = [];
+
+  for (const opt of stage1Options) {
+    if (additionalOptions.length >= neededCount) break;
+
+    if (!isOptionDuplicate(opt, [...commonOptions, ...additionalOptions])) {
+      additionalOptions.push(opt);
+    }
+  }
+
+  console.log(`✅ Local enhancement added ${additionalOptions.length} options`);
+  return additionalOptions;
+}
+
+function isOptionDuplicate(option: string, existingOptions: string[]): boolean {
+  const cleanOpt = option.trim().toLowerCase();
+
+  return existingOptions.some(existing => {
+    const cleanExisting = existing.trim().toLowerCase();
+    if (cleanOpt === cleanExisting) return true;
+    if (areOptionsStronglySimilar(option, existing)) return true;
+    return false;
+  });
 }

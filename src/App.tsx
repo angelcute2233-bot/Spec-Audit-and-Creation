@@ -4,7 +4,7 @@ import AuditResults from "./components/AuditResults";
 import URLInput from "./components/URLInput";
 import Stage2Results from "./components/Stage2Results";
 import Stage3Results from "./components/Stage3Results";
-import { auditSpecificationsWithGemini, extractISQWithGemini, generateBuyerISQsFromSpecs, findCommonSpecsWithGemini } from "./utils/api";
+import { auditSpecificationsWithGemini, extractISQWithGemini, generateBuyerISQsWithGemini, findCommonSpecsWithGemini } from "./utils/api";
 import { generateAuditExcel, generateCombinedExcel } from "./utils/excel";
 import type { AuditInput as AuditInputType, AuditResult, UploadedSpec, ISQ, InputData } from "./types";
 import { Download, RefreshCw } from "lucide-react";
@@ -76,13 +76,13 @@ function App() {
       console.log("✅ Common specs found:", commonSpecsResult.commonSpecs);
       setCommonSpecs(commonSpecsResult.commonSpecs);
 
-      console.log("🎯 Generating buyer ISQs from common specs...");
+      console.log("🎯 Generating buyer ISQs with Gemini...");
       setProcessingStage("Generating buyer ISQs...");
 
-      const buyerISQs = generateBuyerISQsFromSpecs(originalSpecs, {
-        config: result.config,
-        keys: result.keys
-      });
+      const buyerISQs = await generateBuyerISQsWithGemini(
+        commonSpecsResult.commonSpecs,
+        originalSpecs
+      );
 
       console.log("✅ Buyer ISQs generated:", buyerISQs);
 
@@ -133,13 +133,13 @@ function App() {
       console.log("✅ Common specs found:", commonSpecsResult.commonSpecs);
       setCommonSpecs(commonSpecsResult.commonSpecs);
 
-      console.log("🎯 Regenerating buyer ISQs from common specs...");
+      console.log("🎯 Regenerating buyer ISQs with Gemini...");
       setProcessingStage("Generating buyer ISQs...");
 
-      const buyerISQs = generateBuyerISQsFromSpecs(originalSpecs, {
-        config: result.config,
-        keys: result.keys
-      });
+      const buyerISQs = await generateBuyerISQsWithGemini(
+        commonSpecsResult.commonSpecs,
+        originalSpecs
+      );
 
       console.log("✅ Buyer ISQs regenerated:", buyerISQs);
 
