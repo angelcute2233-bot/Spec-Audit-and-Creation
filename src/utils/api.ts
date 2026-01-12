@@ -1644,210 +1644,6 @@ function extractRawText(response: any): string {
   }
 }
 
-export async function findCommonSpecsWithGemini(
-  stage1Specs: { spec_name: string; options: string[]; tier?: string }[],
-  stage2ISQs: { config: ISQ; keys: ISQ[]; buyers?: ISQ[] }
-): Promise<{ commonSpecs: Array<{ spec_name: string; options: string[]; category: string }> }> {
-  console.log("🚀 Stage 3: Finding ALL common specifications...");
-  
-  // 1. FIRST use Gemini API
-  console.log("🤖 First trying Gemini API...");
-  const geminiResult = await findCommonSpecsWithGeminiAPI(stage1Specs, stage2ISQs);
-  
-  if (geminiResult.length > 0) {
-    console.log(`✅ Gemini found ${geminiResult.length} common specs`);
-    return { commonSpecs: geminiResult };
-  }
-  
-  // 2. If Gemini returns nothing, try local matching
-  console.log("⚠️ Gemini found nothing, trying local matching...");
-  const localResult = findCommonSpecsLocally(stage1Specs, stage2ISQs);
-  
-  return { commonSpecs: localResult };
-}
-
-// Helper 1: Use Gemini API FIRST
-async function findCommonSpecsWithGeminiAPI(
-  stage1Specs: { spec_name: string; options: string[]; tier?: string }[],
-  stage2ISQs: { config: ISQ; keys: ISQ[]; buyers?: ISQ[] }
-): Promise<Array<{ spec_name: string; options: string[]; category: string }>> {
-  if (!STAGE3_API_KEY) {
-    console.warn("⚠️ Stage 3 API key not configured");
-    return [];
-  }
-  
-  // Flatten Stage 2 for Gemini
-  const stage2All = [];
-  if (stage2ISQs.config?.name) {
-    stage2All.push({
-      name: stage2ISQs.config.name,
-      options: stage2ISQs.config.options || []
-    });
-  }
-  if (stage2ISQs.keys?.length > 0) {
-    stage2All.push(...stage2ISQs.keys.filter(k => k.name && k.options?.length > 0));
-  }
-  if (stage2ISQs.buyers?.length > 0) {
-    stage2All.push(...stage2ISQs.buyers.filter(b => b.name && b.options?.length > 0));
-  }
-  
-  const prompt = `You are an AI that finds COMMON specifications between two data sources.
-
-STAGE 1 SPECIFICATIONS (from uploaded data):
-${stage1Specs.map((s, i) => `${i + 1}. ${s.spec_name} (${s.tier || 'Unknown'})
-   Options: ${s.options.join(', ')}`).join('\n')}
-
-STAGE 2 SPECIFICATIONS (from website data):
-${stage2All.map((s, i) => `${i + 1}. ${s.name}
-   Options: ${s.options.join(', ')}`).join('\n')}
-
-IMPORTANT INSTRUCTIONS:
-1. Find ALL specifications that exist in BOTH Stage 1 and Stage 2
-2. Include specifications even if they have ZERO common options
-3. For each common specification:
-   - Use the EXACT "spec_name" from Stage 1
-   - Use the category from Stage 1 (Primary/Secondary)
-   - Find common options if available
-   - If NO common options, show "No common options available" as option
-
-EXAMPLES:
-• If Stage 1 has "Grade" with options ["304", "316"] and Stage 2 has "Grade" with options ["304", "202"]
-  → Return: {"spec_name": "Grade", "options": ["304"], "category": "Primary"}
-  
-• If Stage 1 has "Finish" with options ["Polished"] and Stage 2 has "Finish" with options ["Matte"]
-  → Return: {"spec_name": "Finish", "options": ["No common options available"], "category": "Secondary"}
-
-• If Stage 1 has "Thickness" and Stage 2 also has "Thickness"
-  → Return: {"spec_name": "Thickness", "options": ["No common options available"], "category": "Primary"}
-
-SEMANTIC MATCHING:
-Match these names as SAME specification:
-- "Grade" = "Material Grade" = "Quality"
-- "Thickness" = "Thk" = "Gauge"
-- "Finish" = "Surface" = "Coating"
-
-OUTPUT FORMAT (JSON ONLY):
-{
-  "common_specs": [
-    {
-      "spec_name": "Grade",
-      "options": ["304", "316"],
-      "category": "Primary"
-    },
-    {
-      "spec_name": "Finish",
-      "options": ["No common options available"],
-      "category": "Secondary"
-    }
-  ]
-}
-
-CRITICAL:
-1. Return ALL common specs
-2. If NO common options, include "No common options available" in options array
-3. Output ONLY valid JSON`;
-
-  try {
-    console.log("📡 Calling Gemini API...");
-    const response = await fetchWithRetry(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${STAGE3_API_KEY}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            temperature: 0.1,
-            maxOutputTokens: 4096,
-            responseMimeType: "application/json"
-          }
-        })
-      },
-      2,
-      10000
-    );
-
-    const data = await response.json();
-    console.log("✅ Gemini response received");
-    
-    const result = extractJSONFromGemini(data);
-    
-    if (result && result.common_specs && Array.isArray(result.common_specs)) {
-      console.log(`🎉 Gemini found ${result.common_specs.length} common specifications`);
-      return result.common_specs;
-    }
-
-    console.warn("⚠️ Gemini returned no valid data");
-    return [];
-
-  } catch (error) {
-    console.error("❌ Gemini API error:", error);
-    return [];
-  }
-}
-
-// Helper 2: Local matching if Gemini fails
-function findCommonSpecsLocally(
-  stage1Specs: { spec_name: string; options: string[]; tier?: string }[],
-  stage2ISQs: { config: ISQ; keys: ISQ[]; buyers?: ISQ[] }
-): Array<{ spec_name: string; options: string[]; category: string }> {
-  console.log("🔍 Looking for common specs locally...");
-  
-  // Flatten Stage 2 specs
-  const stage2All: { name: string; options: string[] }[] = [];
-  
-  // Add Config
-  if (stage2ISQs.config?.name && stage2ISQs.config.options?.length > 0) {
-    stage2All.push({
-      name: stage2ISQs.config.name,
-      options: stage2ISQs.config.options
-    });
-  }
-  
-  // Add Keys
-  if (stage2ISQs.keys?.length > 0) {
-    stage2All.push(...stage2ISQs.keys.filter(k => k.name && k.options?.length > 0));
-  }
-  
-  // Add Buyers
-  if (stage2ISQs.buyers?.length > 0) {
-    stage2All.push(...stage2ISQs.buyers.filter(b => b.name && b.options?.length > 0));
-  }
-  
-  const commonSpecs: Array<{ spec_name: string; options: string[]; category: string }> = [];
-  
-  stage1Specs.forEach(stage1Spec => {
-    // Find matching spec in Stage 2
-    const matchingStage2 = stage2All.find(stage2Spec => 
-      isSemanticallySimilar(stage1Spec.spec_name, stage2Spec.name)
-    );
-    
-    if (matchingStage2) {
-      // Find common options
-      const commonOptions = findCommonOptions(
-        stage1Spec.options, 
-        matchingStage2.options
-      );
-      
-      // If no common options, add message
-      const finalOptions = commonOptions.length > 0 
-        ? commonOptions 
-        : ["No common options available"];
-      
-      commonSpecs.push({
-        spec_name: stage1Spec.spec_name,
-        options: finalOptions,
-        category: stage1Spec.tier === 'Primary' ? 'Primary' : 'Secondary'
-      });
-      
-      console.log(`✅ Found local common: ${stage1Spec.spec_name} (${commonOptions.length} common options)`);
-    }
-  });
-  
-  console.log(`📊 Found ${commonSpecs.length} common specs locally`);
-  return commonSpecs;
-}
-
 // SIMPLE: Get Buyer ISQs - First 2 from Common Specifications
 export function selectStage3BuyerISQs(
   commonSpecs: Array<{ spec_name: string; options: string[]; category: string }>,
@@ -1864,50 +1660,81 @@ export function selectStage3BuyerISQs(
   const topSpecs = commonSpecs.slice(0, 2);
   console.log(`📦 Taking first ${topSpecs.length} specs for Buyer ISQs`);
   
-  const buyerISQs: ISQ[] = topSpecs.map(spec => {
+  const buyerISQs: ISQ[] = [];
+  
+  topSpecs.forEach(spec => {
     console.log(`\n🔧 Processing Buyer ISQ: ${spec.spec_name}`);
-    console.log(`   Options from common: ${spec.options.length}`);
+    console.log(`   Original options from common:`, spec.options);
     
-    // Remove "No common options available" message if present
+    // Step 1: Remove "No common options available" message
     let finalOptions = spec.options.filter(opt => 
-      !opt.toLowerCase().includes('no common options')
+      !opt.toLowerCase().includes('no common options available')
     );
     
-    // If options are less than 8, get more from Stage 1
-    if (finalOptions.length < 8) {
+    console.log(`   After removing 'no common options': ${finalOptions.length} options`);
+    
+    // Step 2: If we have NO options at all, check Stage 1
+    if (finalOptions.length === 0) {
+      console.log(`   No options in common, checking Stage 1...`);
+      const stage1Spec = stage1Specs.find(s => 
+        s.spec_name === spec.spec_name
+      );
+      
+      if (stage1Spec && stage1Spec.options.length > 0) {
+        // Take up to 8 options from Stage 1
+        finalOptions = stage1Spec.options.slice(0, 8);
+        console.log(`   Added ${finalOptions.length} options from Stage 1`);
+      }
+    }
+    
+    // Step 3: If we have SOME options but less than 8, add more from Stage 1
+    if (finalOptions.length > 0 && finalOptions.length < 8) {
       const stage1Spec = stage1Specs.find(s => 
         s.spec_name === spec.spec_name
       );
       
       if (stage1Spec) {
-        const additionalOptions = stage1Spec.options
-          .filter(opt => {
-            // Check if option already exists
-            const lowerOpt = opt.trim().toLowerCase();
-            return !finalOptions.some(existing => 
-              existing.trim().toLowerCase() === lowerOpt
-            );
-          })
-          .slice(0, 8 - finalOptions.length);
+        // Find options from Stage 1 that are NOT already in finalOptions
+        const additionalOptions = stage1Spec.options.filter(opt => {
+          const lowerOpt = opt.trim().toLowerCase();
+          return !finalOptions.some(existing => 
+            existing.trim().toLowerCase() === lowerOpt
+          );
+        });
         
-        if (additionalOptions.length > 0) {
-          console.log(`   Adding ${additionalOptions.length} options from Stage 1`);
-          finalOptions = [...finalOptions, ...additionalOptions];
+        // Add only as many as needed to reach 8
+        const needed = 8 - finalOptions.length;
+        const toAdd = additionalOptions.slice(0, needed);
+        
+        if (toAdd.length > 0) {
+          console.log(`   Adding ${toAdd.length} more options from Stage 1`);
+          finalOptions = [...finalOptions, ...toAdd];
         }
       }
     }
     
-    // Ensure max 8 options
+    // Step 4: Ensure max 8 options
     finalOptions = finalOptions.slice(0, 8);
+    
+    // Step 5: If still no options, add a placeholder
+    if (finalOptions.length === 0) {
+      console.log(`   Still no options, adding placeholder`);
+      finalOptions = ["Options not available"];
+    }
     
     console.log(`   ✅ Final: ${finalOptions.length} options`);
     
-    return {
+    buyerISQs.push({
       name: spec.spec_name,
       options: finalOptions
-    };
+    });
   });
   
   console.log(`🎉 Created ${buyerISQs.length} Buyer ISQs`);
+  buyerISQs.forEach((isq, i) => {
+    console.log(`  ${i+1}. ${isq.name}: ${isq.options.length} options`);
+  });
+  
   return buyerISQs;
+}
 }
