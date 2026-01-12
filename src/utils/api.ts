@@ -1453,6 +1453,7 @@ IMPORTANT INSTRUCTIONS:
    - Use the category from Stage 1 (Primary/Secondary)
    - Find ALL common options between the two stages
    - If NO common options, show empty options list
+   - If one stage has options **range** (e.g., "1-5 mm") and the other stage has **discrete numbers** (e.g., "1 mm, 2 mm, 3 mm"), treat all discrete numbers that fall within the range as common options
    - You MUST return the common options in format **exactly as it appears in the Stage 1 list**
 
 OUTPUT FORMAT (PLAIN TEXT TABLE):
