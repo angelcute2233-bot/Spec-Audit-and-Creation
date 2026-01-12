@@ -1489,8 +1489,7 @@ CRITICAL RANGE HANDLING FOR COMMON OPTIONS:
 5. If Stage 2 has multiple overlapping ranges (like "0.14-2.00 mm" and "0.25-2.00 mm"):
    - Consider the WIDER range ("0.14-2.00 mm") for comparison
    - Remove redundant narrower ranges
-
-   
+  
 OUTPUT FORMAT (PLAIN TEXT TABLE):
 Specification Name | Stage 1 Category | Common Options
 Grade | Primary | 304, 316, 430
