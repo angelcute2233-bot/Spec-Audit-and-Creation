@@ -106,7 +106,7 @@ export default function Stage3Results({ commonSpecs, buyerISQs }: Stage3ResultsP
             </h3>
           </div>
           <p className="text-sm text-amber-700 mb-6">
-           Bases on Seller Specs & Website Benchmarking
+           Bases on Seller ISQs & Website Benchmarking
           </p>
 
           <div className="max-h-[600px] overflow-y-auto pr-2">
