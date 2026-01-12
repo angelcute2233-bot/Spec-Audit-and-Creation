@@ -1333,21 +1333,81 @@ export async function findCommonSpecsWithGemini(
   stage2ISQs: { config: ISQ; keys: ISQ[]; buyers?: ISQ[] }
 ): Promise<{ commonSpecs: Array<{ spec_name: string; options: string[]; category: string }> }> {
   console.log("🚀 Stage 3: Finding ALL common specifications...");
-  
+
   // 1. FIRST use Gemini API
   console.log("🤖 First trying Gemini API...");
   const geminiResult = await findCommonSpecsWithGeminiAPI(stage1Specs, stage2ISQs);
-  
+
   if (geminiResult.length > 0) {
     console.log(`✅ Gemini found ${geminiResult.length} common specs`);
-    return { commonSpecs: geminiResult };
+    const dedupedSpecs = deduplicateCommonSpecs(geminiResult);
+    console.log(`✅ After deduplication: ${dedupedSpecs.length} specs`);
+    return { commonSpecs: dedupedSpecs };
   }
-  
+
   // 2. If Gemini returns nothing, try local matching
   console.log("⚠️ Gemini found nothing, trying local matching...");
   const localResult = findCommonSpecsLocally(stage1Specs, stage2ISQs);
-  
-  return { commonSpecs: localResult };
+  const dedupedSpecs = deduplicateCommonSpecs(localResult);
+  console.log(`✅ After deduplication: ${dedupedSpecs.length} specs`);
+
+  return { commonSpecs: dedupedSpecs };
+}
+
+function deduplicateCommonSpecs(
+  specs: Array<{ spec_name: string; options: string[]; category: string }>
+): Array<{ spec_name: string; options: string[]; category: string }> {
+  console.log("🧹 Deduplicating common specifications...");
+
+  const seenSpecs = new Map<string, { spec_name: string; options: string[]; category: string }>();
+  const result: Array<{ spec_name: string; options: string[]; category: string }> = [];
+
+  for (const spec of specs) {
+    const normalizedSpecName = normalizeSpecName(spec.spec_name);
+
+    // Check if we already have this spec
+    if (seenSpecs.has(normalizedSpecName)) {
+      console.log(`   Duplicate spec found: "${spec.spec_name}", merging options...`);
+      const existing = seenSpecs.get(normalizedSpecName)!;
+
+      // Merge options without duplicates
+      const mergedOptions = new Set<string>();
+      existing.options.forEach(opt => mergedOptions.add(opt.toLowerCase()));
+      spec.options.forEach(opt => {
+        const optLower = opt.toLowerCase();
+        if (!mergedOptions.has(optLower) && !isOptionDuplicate(opt, Array.from(mergedOptions))) {
+          existing.options.push(opt);
+          mergedOptions.add(optLower);
+        }
+      });
+
+      console.log(`   Merged options: ${existing.options.length} unique options`);
+    } else {
+      // Deduplicate options within this spec
+      const uniqueOptions: string[] = [];
+      const seenOptions = new Set<string>();
+
+      for (const opt of spec.options) {
+        const optLower = opt.toLowerCase();
+        if (!seenOptions.has(optLower) && !isOptionDuplicate(opt, uniqueOptions)) {
+          uniqueOptions.push(opt);
+          seenOptions.add(optLower);
+        }
+      }
+
+      seenSpecs.set(normalizedSpecName, {
+        spec_name: spec.spec_name,
+        options: uniqueOptions,
+        category: spec.category
+      });
+
+      result.push(seenSpecs.get(normalizedSpecName)!);
+      console.log(`   Added spec: "${spec.spec_name}" with ${uniqueOptions.length} unique options`);
+    }
+  }
+
+  console.log(`✅ Deduplication complete: ${result.length} unique specs`);
+  return result;
 }
 
 // Helper 1: Use Gemini API FIRST
@@ -1359,7 +1419,7 @@ async function findCommonSpecsWithGeminiAPI(
     console.warn("⚠️ Stage 3 API key not configured");
     return [];
   }
-  
+
   // Flatten Stage 2 for Gemini
   const stage2All = [];
   if (stage2ISQs.config?.name) {
@@ -1374,7 +1434,7 @@ async function findCommonSpecsWithGeminiAPI(
   if (stage2ISQs.buyers?.length > 0) {
     stage2All.push(...stage2ISQs.buyers.filter(b => b.name && b.options?.length > 0));
   }
-  
+
   const prompt = `You are an AI that finds COMMON specifications between two data sources.
 
 STAGE 1 SPECIFICATIONS (from uploaded data):
@@ -1387,46 +1447,28 @@ ${stage2All.map((s, i) => `${i + 1}. ${s.name}
 
 IMPORTANT INSTRUCTIONS:
 1. Find ALL specifications that exist in BOTH Stage 1 and Stage 2
-2. Include specifications even if they have ZERO common options
-3. For each common specification:
+2. For each common specification:
    - Use the EXACT "spec_name" from Stage 1
    - Use the category from Stage 1 (Primary/Secondary)
-   - Find ALL common options (not just 8, find ALL)
-   - If NO common options, show "No common options available" as ONE option in array
+   - Find ALL common options between the two stages
+   - If NO common options, show empty options list
 
-EXAMPLES:
-• Stage 1: "Grade" options ["304", "316", "430"]
-  Stage 2: "Grade" options ["304", "202", "316"]
-  → Return: {"spec_name": "Grade", "options": ["304", "316"], "category": "Primary"}
-  
-• Stage 1: "Finish" options ["Polished", "Matte"]
-  Stage 2: "Finish" options ["Brushed", "Anodized"]
-  → Return: {"spec_name": "Finish", "options": ["No common options available"], "category": "Secondary"}
-
-OUTPUT FORMAT (JSON ONLY):
-{
-  "common_specs": [
-    {
-      "spec_name": "Grade",
-      "options": ["304", "316"],
-      "category": "Primary"
-    },
-    {
-      "spec_name": "Finish",
-      "options": ["No common options available"],
-      "category": "Secondary"
-    }
-  ]
-}
+OUTPUT FORMAT (PLAIN TEXT TABLE):
+Specification Name | Stage 1 Category | Common Options
+Grade | Primary | 304, 316, 430
+Finish | Secondary |
+Type | Primary | A, B, C
 
 CRITICAL:
-1. Return ALL common specs
-2. If NO common options, include "No common options available" in options array
-3. If there ARE common options, list ALL of them (not limited to 8)
-4. Output ONLY valid JSON`;
+1. Return ALL common specs found in both stages
+2. Each line represents ONE specification
+3. Use pipe (|) to separate columns
+4. If no common options, leave that column empty
+5. List common options separated by commas
+6. NO JSON, NO MARKDOWN, JUST PLAIN TEXT TABLE`;
 
   try {
-    console.log("📡 Calling Gemini API...");
+    console.log("📡 Calling Gemini API for common specs...");
     const response = await fetchWithRetry(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${STAGE3_API_KEY}`,
       {
@@ -1437,7 +1479,7 @@ CRITICAL:
           generationConfig: {
             temperature: 0.1,
             maxOutputTokens: 4096,
-            responseMimeType: "application/json"
+            responseMimeType: "text/plain"
           }
         })
       },
@@ -1447,12 +1489,16 @@ CRITICAL:
 
     const data = await response.json();
     console.log("✅ Gemini response received");
-    
-    const result = extractJSONFromGemini(data);
-    
-    if (result && result.common_specs && Array.isArray(result.common_specs)) {
-      console.log(`🎉 Gemini found ${result.common_specs.length} common specifications`);
-      return result.common_specs;
+
+    const textResponse = extractRawText(data);
+    console.log("📝 Gemini text response (first 500 chars):");
+    console.log(textResponse.substring(0, 500));
+
+    const result = parseCommonSpecsFromText(textResponse, stage1Specs);
+
+    if (result && result.length > 0) {
+      console.log(`🎉 Gemini found ${result.length} common specifications`);
+      return result;
     }
 
     console.warn("⚠️ Gemini returned no valid data");
@@ -1462,6 +1508,53 @@ CRITICAL:
     console.error("❌ Gemini API error:", error);
     return [];
   }
+}
+
+function parseCommonSpecsFromText(
+  text: string,
+  stage1Specs: { spec_name: string; options: string[]; tier?: string }[]
+): Array<{ spec_name: string; options: string[]; category: string }> {
+  console.log("📊 Parsing common specs from text...");
+
+  const result: Array<{ spec_name: string; options: string[]; category: string }> = [];
+  const lines = text.split('\n').filter(line => line.trim().length > 0);
+
+  for (const line of lines) {
+    // Skip header lines
+    if (line.toLowerCase().includes('specification') || line.includes('---') || line.includes('===')) {
+      continue;
+    }
+
+    // Split by pipe |
+    const parts = line.split('|').map(p => p.trim()).filter(p => p.length > 0);
+
+    if (parts.length >= 2) {
+      const specName = parts[0];
+      const category = parts.length > 2 ? parts[1] : 'Primary';
+      const optionsStr = parts.length > 2 ? parts[2] : parts[1];
+
+      // Find matching Stage 1 spec to get exact name and category
+      const stage1Match = stage1Specs.find(s =>
+        isSemanticallySimilar(s.spec_name, specName)
+      );
+
+      if (stage1Match) {
+        const commonOptions = optionsStr
+          .split(',')
+          .map(opt => opt.trim())
+          .filter(opt => opt.length > 0 && !opt.toLowerCase().includes('no common'));
+
+        result.push({
+          spec_name: stage1Match.spec_name,
+          options: commonOptions,
+          category: stage1Match.tier || 'Primary'
+        });
+      }
+    }
+  }
+
+  console.log(`✅ Parsed ${result.length} common specs from text`);
+  return result;
 }
 
 // Helper 2: Local matching if Gemini fails
@@ -1558,9 +1651,10 @@ export async function generateBuyerISQsWithGemini(
 
     if (!stage1Spec) {
       console.log(`   No matching Stage 1 spec found, using common options only`);
+      const finalOptions = deduplicateOptions(commonOptions).slice(0, 8);
       buyerISQs.push({
         name: commonSpec.spec_name,
-        options: commonOptions.slice(0, 8)
+        options: finalOptions
       });
       continue;
     }
@@ -1569,9 +1663,10 @@ export async function generateBuyerISQsWithGemini(
 
     if (commonOptions.length >= 8) {
       console.log(`   Already have 8+ common options, using first 8`);
+      const finalOptions = deduplicateOptions(commonOptions).slice(0, 8);
       buyerISQs.push({
         name: commonSpec.spec_name,
-        options: commonOptions.slice(0, 8)
+        options: finalOptions
       });
       continue;
     }
@@ -1585,7 +1680,7 @@ export async function generateBuyerISQsWithGemini(
       8 - commonOptions.length
     );
 
-    const finalOptions = [...commonOptions, ...enhancedOptions].slice(0, 8);
+    const finalOptions = deduplicateOptions([...commonOptions, ...enhancedOptions]).slice(0, 8);
 
     console.log(`   ✅ Final: ${finalOptions.length} options (${commonOptions.length} common + ${enhancedOptions.length} from Stage 1)`);
 
@@ -1601,6 +1696,21 @@ export async function generateBuyerISQsWithGemini(
   });
 
   return buyerISQs;
+}
+
+function deduplicateOptions(options: string[]): string[] {
+  const uniqueOptions: string[] = [];
+  const seenOptions = new Set<string>();
+
+  for (const opt of options) {
+    const optLower = opt.toLowerCase().trim();
+    if (!seenOptions.has(optLower) && !isOptionDuplicate(opt, uniqueOptions)) {
+      uniqueOptions.push(opt);
+      seenOptions.add(optLower);
+    }
+  }
+
+  return uniqueOptions;
 }
 
 async function enhanceOptionsWithGemini(

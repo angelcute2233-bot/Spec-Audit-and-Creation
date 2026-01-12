@@ -10,12 +10,6 @@ interface Stage3ResultsProps {
   buyerISQs: ISQ[];
 }
 
-interface CommonSpecItem {
-  spec_name: string;
-  options: string[];
-  category: string;
-}
-
 export default function Stage3Results({ commonSpecs, buyerISQs }: Stage3ResultsProps) {
   const [showAllBuyerISQs, setShowAllBuyerISQs] = useState(false);
 
@@ -50,15 +44,53 @@ export default function Stage3Results({ commonSpecs, buyerISQs }: Stage3ResultsP
             True overlap between Stage 1 and Stage 2 specifications
           </p>
 
-          <div className="space-y-6 max-h-[500px] overflow-y-auto pr-2">
+          <div className="max-h-[600px] overflow-y-auto pr-2">
             {commonSpecs.length === 0 ? (
               <div className="bg-white border border-blue-200 p-4 rounded-lg text-center">
                 <p className="text-gray-600">No common specifications found</p>
               </div>
             ) : (
-              commonSpecs.map((spec, idx) => (
-                <SpecCard key={idx} spec={spec} />
-              ))
+              <div className="bg-white border border-blue-200 rounded-lg overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-blue-200 bg-blue-100">
+                      <th className="px-4 py-3 text-left font-semibold text-blue-900">Specification</th>
+                      <th className="px-4 py-3 text-left font-semibold text-blue-900">Category</th>
+                      <th className="px-4 py-3 text-left font-semibold text-blue-900">Common Options</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {commonSpecs.map((spec, idx) => (
+                      <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-blue-50'}>
+                        <td className="px-4 py-3 font-medium text-gray-900 border-b border-blue-100">
+                          {spec.spec_name}
+                        </td>
+                        <td className="px-4 py-3 border-b border-blue-100">
+                          <span className="inline-block bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-medium">
+                            {spec.category}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 border-b border-blue-100">
+                          {spec.options.length === 0 ? (
+                            <span className="text-gray-400 italic text-xs">No options</span>
+                          ) : (
+                            <div className="flex flex-wrap gap-1">
+                              {spec.options.map((option, optIdx) => (
+                                <span
+                                  key={optIdx}
+                                  className="inline-block bg-blue-50 border border-blue-300 text-blue-800 px-2 py-1 rounded text-xs"
+                                >
+                                  {option}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
         </div>
@@ -77,121 +109,81 @@ export default function Stage3Results({ commonSpecs, buyerISQs }: Stage3ResultsP
             Top 2 common specs enhanced with additional Stage 1 options (max 8 per spec)
           </p>
 
-          {buyerISQs.length === 0 ? (
-            <div className="bg-white border border-amber-200 p-6 rounded-lg text-center">
-              <p className="text-gray-600">No Buyer ISQs generated</p>
-            </div>
-          ) : (
-            <div className="space-y-6 max-h-[500px] overflow-y-auto pr-2">
-              {displayedBuyerISQs.map((spec, idx) => (
-                <BuyerISQCard key={idx} spec={spec} index={idx} />
-              ))}
-
-              {hasMoreBuyerISQs && (
-                <div className="mt-6 text-center">
-                  <button
-                    onClick={() => setShowAllBuyerISQs(!showAllBuyerISQs)}
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-amber-100 hover:bg-amber-200 text-amber-800 font-medium rounded-lg transition-colors"
-                  >
-                    {showAllBuyerISQs ? (
-                      <>
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-                        </svg>
-                        Show Less
-                      </>
-                    ) : (
-                      <>
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                        Show All {buyerISQs.length} Buyer ISQs
-                      </>
-                    )}
-                  </button>
+          <div className="max-h-[600px] overflow-y-auto pr-2">
+            {buyerISQs.length === 0 ? (
+              <div className="bg-white border border-amber-200 p-4 rounded-lg text-center">
+                <p className="text-gray-600">No Buyer ISQs generated</p>
+              </div>
+            ) : (
+              <>
+                <div className="bg-white border border-amber-200 rounded-lg overflow-hidden mb-4">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-amber-200 bg-amber-100">
+                        <th className="px-4 py-3 text-left font-semibold text-amber-900">#</th>
+                        <th className="px-4 py-3 text-left font-semibold text-amber-900">Specification</th>
+                        <th className="px-4 py-3 text-left font-semibold text-amber-900">Options</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {displayedBuyerISQs.map((spec, idx) => (
+                        <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-amber-50'}>
+                          <td className="px-4 py-3 font-medium text-amber-900 border-b border-amber-100 w-8">
+                            {idx + 1}
+                          </td>
+                          <td className="px-4 py-3 font-medium text-gray-900 border-b border-amber-100">
+                            {spec.name}
+                          </td>
+                          <td className="px-4 py-3 border-b border-amber-100">
+                            {spec.options.length > 0 ? (
+                              <div className="flex flex-wrap gap-1">
+                                {spec.options.map((option, optIdx) => (
+                                  <span
+                                    key={optIdx}
+                                    className="inline-block bg-amber-50 border border-amber-300 text-amber-800 px-2 py-1 rounded text-xs"
+                                  >
+                                    {option}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : (
+                              <span className="text-gray-400 italic text-xs">No options</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
 
-function SpecCard({
-  spec,
-}: {
-  spec: CommonSpecItem;
-}) {
-  // Check if this spec has "No common options available"
-  const hasNoCommonOptions = spec.options.length === 1 && 
-    spec.options[0].toLowerCase().includes('no common options available');
-
-  return (
-    <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
-      <div className="flex items-start justify-between mb-3">
-        <div className="flex-1">
-          <div className="font-semibold text-gray-900 text-lg">{spec.spec_name}</div>
-          <div className="text-xs text-gray-600 mt-2">
-            <span className="inline-block bg-blue-100 px-2 py-1 rounded">
-              {spec.category}
-            </span>
-            <span className="ml-2 text-gray-500 text-xs">
-              {hasNoCommonOptions ? "No common options" : `${spec.options.length} common options`}
-            </span>
+                {hasMoreBuyerISQs && (
+                  <div className="text-center">
+                    <button
+                      onClick={() => setShowAllBuyerISQs(!showAllBuyerISQs)}
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-amber-100 hover:bg-amber-200 text-amber-800 font-medium rounded-lg transition-colors"
+                    >
+                      {showAllBuyerISQs ? (
+                        <>
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                          </svg>
+                          Show Less
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                          Show All {buyerISQs.length} Buyer ISQs
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
           </div>
         </div>
-      </div>
-
-      <div className="flex flex-wrap gap-2">
-        {hasNoCommonOptions ? (
-          <span className="text-gray-400 italic text-sm">
-            No common options available
-          </span>
-        ) : (
-          spec.options.map((option, idx) => (
-            <span key={idx} className="text-blue-800 bg-white border border-blue-300 px-3 py-1 rounded-full text-sm">
-              {option}
-            </span>
-          ))
-        )}
-      </div>
-    </div>
-  );
-}
-
-function BuyerISQCard({ spec, index }: { spec: ISQ; index: number }) {
-  return (
-    <div className="bg-amber-50 border border-amber-200 p-4 rounded-lg">
-      <div className="flex items-start justify-between mb-3">
-        <div className="flex-1">
-          <div className="font-semibold text-gray-900 text-lg flex items-center gap-2">
-            <span className="inline-block w-6 h-6 bg-amber-300 rounded-full flex items-center justify-center text-amber-900 text-xs font-bold">
-              {index + 1}
-            </span>
-            {spec.name}
-          </div>
-          <div className="text-xs text-gray-600 mt-2">
-            <span className="inline-block bg-amber-100 px-2 py-1 rounded">
-              {spec.options.length} options
-            </span>
-          </div>
-        </div>
-      </div>
-
-      <div className="flex flex-wrap gap-2">
-        {spec.options.length > 0 ? (
-          spec.options.map((option, idx) => (
-            <span key={idx} className="text-amber-800 bg-white border border-amber-300 px-3 py-1 rounded-full text-sm">
-              {option}
-            </span>
-          ))
-        ) : (
-          <span className="text-gray-400 italic text-sm">
-            No options available
-          </span>
-        )}
       </div>
     </div>
   );
