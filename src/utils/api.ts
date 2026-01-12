@@ -1743,7 +1743,8 @@ CRITICAL RULES:
 3. Select the MOST RELEVANT and COMMONLY USED options for "${specName}"
 4. Prefer options that are industry-standard or widely used
 5. Select exactly ${neededCount} options (no more, no less)
-6. If fewer than ${neededCount} unique options are available, return as many as possible
+6. If fewer than ${neededCount} unique options are available, return as many as possible.
+7. DO NOT include option "Other", "etc.".
 
 EXAMPLES OF SEMANTIC DUPLICATES (DO NOT SELECT):
 - If "304" exists, don't select "SS304", "ss304", "Stainless Steel 304"
