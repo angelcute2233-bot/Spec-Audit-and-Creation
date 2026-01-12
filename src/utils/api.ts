@@ -1681,7 +1681,7 @@ export async function generateBuyerISQsWithGemini(
       8 - commonOptions.length
     );
 
-    const finalOptions = deduplicateOptions([...commonOptions, ...enhancedOptions]).slice(0, 8);
+    const finalOptions = cleanBuyerISQOptions([...commonOptions, ...enhancedOptions]).slice(0, 8);
 
     console.log(`   ✅ Final: ${finalOptions.length} options (${commonOptions.length} common + ${enhancedOptions.length} from Stage 1)`);
 
