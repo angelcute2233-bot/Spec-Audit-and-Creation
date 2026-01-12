@@ -1674,7 +1674,6 @@ function findCommonSpecsLocally(
 }
 
 // SIMPLE: Get Buyer ISQs - First 2 from Common Specifications
-// SIMPLE: Get Buyer ISQs - First 2 from Common Specifications
 export function selectStage3BuyerISQs(
   commonSpecs: Array<{ spec_name: string; options: string[]; category: string }>,
   stage1Specs: { spec_name: string; options: string[]; tier?: string }[]
