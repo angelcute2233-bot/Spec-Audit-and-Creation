@@ -488,6 +488,7 @@ function extractOptionsFromString(str: string): string[] {
 
 const STAGE1_API_KEY = (import.meta.env.VITE_STAGE1_API_KEY || "").trim();
 const STAGE2_API_KEY = (import.meta.env.VITE_STAGE2_API_KEY || "").trim();
+const STAGE3_API_KEY = (import.meta.env.VITE_STAGE3_API_KEY || "").trim();
 
 export async function auditSpecificationsWithGemini(
   input: AuditInput
@@ -798,26 +799,29 @@ function parseISQFromText(text: string): { config: ISQ; keys: ISQ[] } | null {
       keys: []
     };
 
-    const configMatch = text.match(/===\s*CONFIG SPECIFICATION\s*===\s*\n\s*Name:\s*(.+?)\s*\n\s*Options:\s*(.+?)(?=\n|$)/is);
+    const configMatch = text.match(/===\s*CONFIG SPECIFICATION\s*===\s*\n\s*Name:\s*(.+?)\s*\n\s*Options:\s*(.+?)(?=\n===|\n\n|$)/is);
 
     if (configMatch) {
       const configName = configMatch[1].trim();
       const configOptionsStr = configMatch[2].trim();
-      const configOptions = configOptionsStr
-        .split(/\s*\|\s*/)
-        .map(opt => opt.trim())
-        .filter(opt => opt.length > 0 && opt.toLowerCase() !== 'other' && opt.toLowerCase() !== 'etc')
-        .slice(0, 8);
 
-      result.config = {
-        name: configName,
-        options: configOptions
-      };
+      if (isRelevantSpec(configName)) {
+        const configOptions = configOptionsStr
+          .split(/\s*\|\s*/)
+          .map(opt => opt.trim())
+          .filter(opt => opt.length > 0 && isRelevantOption(opt))
+          .slice(0, 8);
 
-      console.log(`✅ Config parsed: ${configName} with ${configOptions.length} options`);
-    } else {
-      console.warn("⚠️ No config specification found");
-      return null;
+        if (configOptions.length > 0) {
+          result.config = {
+            name: configName,
+            options: configOptions
+          };
+          console.log(`✅ Config parsed: ${configName} with ${configOptions.length} options`);
+        }
+      } else {
+        console.warn(`⚠️ Config spec "${configName}" is not relevant, skipping`);
+      }
     }
 
     for (let i = 1; i <= 3; i++) {
@@ -827,63 +831,85 @@ function parseISQFromText(text: string): { config: ISQ; keys: ISQ[] } | null {
       if (keyMatch) {
         const keyName = keyMatch[1].trim();
         const keyOptionsStr = keyMatch[2].trim();
-        const keyOptions = keyOptionsStr
-          .split(/\s*\|\s*/)
-          .map(opt => opt.trim())
-          .filter(opt => opt.length > 0 && opt.toLowerCase() !== 'other' && opt.toLowerCase() !== 'etc')
-          .slice(0, 6);
 
-        if (keyName && keyOptions.length > 0) {
-          result.keys.push({
-            name: keyName,
-            options: keyOptions
-          });
-          console.log(`✅ Key ${i} parsed: ${keyName} with ${keyOptions.length} options`);
+        if (isRelevantSpec(keyName)) {
+          const keyOptions = keyOptionsStr
+            .split(/\s*\|\s*/)
+            .map(opt => opt.trim())
+            .filter(opt => opt.length > 0 && isRelevantOption(opt))
+            .slice(0, 6);
+
+          if (keyName && keyOptions.length > 0) {
+            result.keys.push({
+              name: keyName,
+              options: keyOptions
+            });
+            console.log(`✅ Key ${i} parsed: ${keyName} with ${keyOptions.length} options`);
+          }
+        } else {
+          console.warn(`⚠️ Key spec "${keyName}" is not relevant, skipping`);
         }
-      } else {
-        console.warn(`⚠️ Key specification ${i} not found`);
       }
     }
 
     if (result.keys.length < 3) {
-      console.warn(`⚠️ Expected 3 key specifications, found ${result.keys.length}`);
-
-      const fallbackPattern = /Name:\s*(.+?)\s*\n\s*Options:\s*(.+?)(?=\n\s*Name:|$)/gis;
-      const allMatches = [...text.matchAll(fallbackPattern)];
-
-      if (allMatches.length > 1) {
-        for (let i = 1; i < Math.min(4, allMatches.length); i++) {
-          if (result.keys.length >= 3) break;
-
-          const match = allMatches[i];
-          const name = match[1].trim();
-          const optionsStr = match[2].trim();
-          const options = optionsStr
-            .split(/\s*\|\s*/)
-            .map(opt => opt.trim())
-            .filter(opt => opt.length > 0 && opt.toLowerCase() !== 'other')
-            .slice(0, 6);
-
-          if (name && options.length > 0 && !result.keys.some(k => k.name === name)) {
-            result.keys.push({ name, options });
-            console.log(`✅ Fallback key ${result.keys.length} parsed: ${name}`);
-          }
-        }
-      }
+      console.log(`ℹ️ Found ${result.keys.length} key specifications (expected up to 3)`);
     }
 
-    if (result.config.name && result.config.options.length > 0 && result.keys.length >= 3) {
-      console.log(`🎉 Successfully parsed: 1 config + ${result.keys.length} keys`);
+    if (result.config.name && result.config.options.length > 0) {
+      console.log(`✅ Parsed: 1 config + ${result.keys.length} keys`);
+      return result;
+    } else if (result.keys.length > 0) {
+      console.log(`✅ Parsed: 0 config + ${result.keys.length} keys`);
       return result;
     } else {
-      console.warn(`⚠️ Incomplete parsing: config=${result.config.name ? 'yes' : 'no'}, keys=${result.keys.length}`);
-      return result.config.name && result.keys.length > 0 ? result : null;
+      console.warn(`⚠️ No valid specs found`);
+      return null;
     }
 
   } catch (error) {
     console.error("❌ Error parsing ISQ text:", error);
     return null;
   }
+}
+
+function isRelevantSpec(specName: string): boolean {
+  const irrelevantSpecs = [
+    'measurement system',
+    'no data',
+    'n/a',
+    'not applicable',
+    'availability',
+    'price',
+    'delivery',
+    'shipping',
+    'payment',
+    'warranty',
+    'guarantee',
+    'location',
+    'seller',
+    'vendor',
+    'supplier'
+  ];
+
+  const lowerSpec = specName.toLowerCase().trim();
+  return !irrelevantSpecs.some(irr => lowerSpec.includes(irr));
+}
+
+function isRelevantOption(option: string): boolean {
+  const irrelevantOptions = [
+    'other',
+    'etc',
+    'n/a',
+    'not applicable',
+    'no data',
+    'none',
+    'select',
+    'choose'
+  ];
+
+  const lowerOpt = option.toLowerCase().trim();
+  return !irrelevantOptions.some(irr => lowerOpt === irr || lowerOpt.includes(irr));
 }
 
 export async function extractISQWithGemini(
@@ -1009,70 +1035,59 @@ function buildISQExtractionPrompt(
     .map((url, i) => `URL ${i + 1}: ${url}\nContent: ${contents[i].substring(0, 1000)}...`)
     .join("\n\n");
 
-  return `You are an AI that extracts product specifications from multiple URLs.
-Your task is to identify the most important specifications and their options accurately.
+  const mcatName = input.mcats.map((m) => m.mcat_name).join(", ");
 
-Extract specifications from these URLs for: ${input.mcats.map((m) => m.mcat_name).join(", ")}
+  return `You are an AI that extracts ONLY RELEVANT product specifications from multiple URLs.
+
+Extract specifications from these URLs for: ${mcatName}
 
 URLs:
 ${urlsText}
 
+CRITICAL RELEVANCE RULES:
+1. ONLY extract specifications that are DIRECTLY RELEVANT to "${mcatName}"
+2. DO NOT extract meta-specifications like:
+   - "Measurement system" (this is not a product specification)
+   - "NO data" (this is not a specification)
+   - "Availability" (not a product spec)
+   - "Price" (not a product specification)
+   - "Delivery" (not a product specification)
+   - Generic system settings or UI options
+3. DO NOT include specifications already in the MCAT name
+4. DO NOT include "Other" or "etc." or "N/A" options
+5. ONLY include specs that appear multiple times across URLs
+
 INSTRUCTIONS:
-
-1. Extract all visible specifications from all URLs
+1. Extract all RELEVANT specifications from all URLs
 2. Combine equivalent specifications and options
-3. Select exactly 1 CONFIG specification (highest frequency, most price-affecting)
-4. Select exactly 3 KEY specifications (next highest frequency)
-4. Options must be the ones most repeated across all URLs.
-6. Show maximum 8 options per specification
-7. Do NOT include specifications already in the MCAT name
-8. Do NOT include "Other" or "etc." options
+3. Select 1 CONFIG specification IF FOUND (highest frequency, most price-affecting)
+4. Select UP TO 3 KEY specifications IF FOUND (next highest frequency)
+5. Options must be the ones most repeated across URLs
+6. Maximum 8 options per Config, 6 per Key
+7. If you cannot find enough relevant specs, output what you find (don't make up specs)
 
-OUTPUT FORMAT (STRICT TEXT TABLE):
-
-You must output EXACTLY in this format with clear section markers:
+OUTPUT FORMAT:
 
 === CONFIG SPECIFICATION ===
 Name: [specification name]
-Options: [option 1] | [option 2] | [option 3] | [option 4] | [option 5] | [option 6] | [option 7] | [option 8]
+Options: [option 1] | [option 2] | [option 3]
 
 === KEY SPECIFICATION 1 ===
 Name: [specification name]
-Options: [option 1] | [option 2] | [option 3] | [option 4] | [option 5] | [option 6]
+Options: [option 1] | [option 2]
 
 === KEY SPECIFICATION 2 ===
 Name: [specification name]
-Options: [option 1] | [option 2] | [option 3] | [option 4] | [option 5]
+Options: [option 1] | [option 2]
 
 === KEY SPECIFICATION 3 ===
 Name: [specification name]
-Options: [option 1] | [option 2] | [option 3] | [option 4]
+Options: [option 1] | [option 2]
 
-EXAMPLE OUTPUT:
+NOTE: If you cannot find 3 keys, output only what you find. Quality over quantity.
+If a specification is not relevant to "${mcatName}", DO NOT include it.
 
-=== CONFIG SPECIFICATION ===
-Name: Grade
-Options: SS 304 | SS 316 | SS 316L | SS 430 | MS | Galvanized
-
-=== KEY SPECIFICATION 1 ===
-Name: Thickness
-Options: 0.5 mm | 1 mm | 1.5 mm | 2 mm | 3 mm | 5 mm
-
-=== KEY SPECIFICATION 2 ===
-Name: Surface Finish
-Options: Hot Rolled | Cold Rolled | Polished | Matte
-
-=== KEY SPECIFICATION 3 ===
-Name: Width
-Options: 1000 mm | 1219 mm | 1500 mm | 2000 mm
-
-CRITICAL RULES:
-- Use section markers EXACTLY as shown: === CONFIG SPECIFICATION ===, === KEY SPECIFICATION 1 ===, etc.
-- Output EXACTLY 1 config and EXACTLY 3 key specifications
-- Separate options with pipe character " | "
-- No explanations, no extra text
-- If fewer than 8 options exist, that's fine
-- Base everything on URL data, no guessing
+CRITICAL: Output ONLY the formatted specifications. No explanations, no apologies, no extra text.
 `;
 }
 
@@ -1626,5 +1641,107 @@ function extractRawText(response: any): string {
     return text.trim();
   } catch {
     return "";
+  }
+}
+
+export async function findCommonSpecsWithGemini(
+  stage1Specs: { spec_name: string; options: string[]; tier?: string }[],
+  stage2ISQs: { config: ISQ; keys: ISQ[]; buyers?: ISQ[] }
+): Promise<{ commonSpecs: Array<{ spec_name: string; options: string[]; category: string }> }> {
+  if (!STAGE3_API_KEY) {
+    console.warn("⚠️ Stage 3 API key not configured, using fallback logic");
+    return { commonSpecs: [] };
+  }
+
+  console.log("🚀 Stage 3: Finding common specifications using Gemini...");
+
+  const stage2All = [];
+  if (stage2ISQs.config?.name) {
+    stage2All.push({
+      name: stage2ISQs.config.name,
+      options: stage2ISQs.config.options || []
+    });
+  }
+  if (stage2ISQs.keys?.length > 0) {
+    stage2All.push(...stage2ISQs.keys.filter(k => k.name && k.options?.length > 0));
+  }
+  if (stage2ISQs.buyers?.length > 0) {
+    stage2All.push(...stage2ISQs.buyers.filter(b => b.name && b.options?.length > 0));
+  }
+
+  const prompt = `You are an AI that finds COMMON specifications between two data sources.
+
+STAGE 1 SPECIFICATIONS (from uploaded data):
+${stage1Specs.map((s, i) => `${i + 1}. ${s.spec_name} (${s.tier || 'Unknown'})
+   Options: ${s.options.join(', ')}`).join('\n')}
+
+STAGE 2 SPECIFICATIONS (from website data):
+${stage2All.map((s, i) => `${i + 1}. ${s.name}
+   Options: ${s.options.join(', ')}`).join('\n')}
+
+TASK:
+1. Find specifications that appear in BOTH Stage 1 and Stage 2
+2. For each common specification, find the COMMON OPTIONS that appear in both stages
+3. Match specifications even if names are slightly different (e.g., "Grade" matches "Material Grade")
+4. Match options even if formatting is slightly different (e.g., "SS 304" matches "ss304" or "304")
+
+OUTPUT FORMAT (JSON):
+{
+  "common_specs": [
+    {
+      "spec_name": "[name from Stage 1]",
+      "options": ["[common option 1]", "[common option 2]"],
+      "category": "[Primary or Secondary]"
+    }
+  ]
+}
+
+RULES:
+1. ONLY include specifications that exist in BOTH stages
+2. ONLY include options that exist in BOTH stages for that specification
+3. Use the specification name from Stage 1
+4. Use the tier/category from Stage 1 (Primary or Secondary)
+5. Be flexible with name matching (synonyms, variations)
+6. Be flexible with option matching (formatting, case, spaces)
+7. If no common specs found, return empty array
+8. Return ONLY valid JSON, no extra text
+
+CRITICAL: Output valid JSON only. Start with { and end with }`;
+
+  try {
+    const response = await fetchWithRetry(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${STAGE3_API_KEY}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.2,
+            maxOutputTokens: 4096,
+            responseMimeType: "application/json"
+          }
+        })
+      },
+      2,
+      10000
+    );
+
+    const data = await response.json();
+    console.log("✅ Stage 3: Gemini response received");
+
+    const result = extractJSONFromGemini(data);
+
+    if (result && result.common_specs && Array.isArray(result.common_specs)) {
+      console.log(`🎉 Stage 3: Found ${result.common_specs.length} common specifications`);
+      return { commonSpecs: result.common_specs };
+    }
+
+    console.warn("⚠️ Stage 3: No valid data from Gemini");
+    return { commonSpecs: [] };
+
+  } catch (error) {
+    console.error("❌ Stage 3 API error:", error);
+    return { commonSpecs: [] };
   }
 }

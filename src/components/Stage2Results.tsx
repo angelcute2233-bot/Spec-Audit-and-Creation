@@ -17,7 +17,7 @@ export default function Stage2Results({ isqs }: Stage2ResultsProps) {
     <div>
       <h2 className="text-2xl font-bold text-gray-900 mb-2">Stage 2: Website ISQ Extraction</h2>
       <p className="text-gray-600 mb-6">
-        Extracted {hasValidConfig ? '1' : '0'} Config ISQ and {displayKeys.length} Key ISQ{displayKeys.length !== 1 ? 's' : ''} from competitor websites
+        Extracted {hasValidConfig ? '1' : '0'} Config ISQ and {displayKeys.length} relevant Key ISQ{displayKeys.length !== 1 ? 's' : ''} from competitor websites
       </p>
 
       <div className="space-y-6">
@@ -84,10 +84,17 @@ export default function Stage2Results({ isqs }: Stage2ResultsProps) {
           </div>
         )}
 
-        {displayKeys.length < 3 && displayKeys.length > 0 && (
+        {displayKeys.length > 0 && displayKeys.length < 3 && (
           <div className="bg-blue-50 border border-blue-300 rounded-lg p-4">
             <p className="text-blue-800 text-sm">
-              Note: Expected 3 Key ISQs, but only {displayKeys.length} {displayKeys.length === 1 ? 'was' : 'were'} extracted from the URLs.
+              Note: Found {displayKeys.length} relevant Key ISQ{displayKeys.length === 1 ? '' : 's'} from the website data. Quality over quantity - irrelevant specifications were filtered out.
+            </p>
+          </div>
+        )}
+        {displayKeys.length === 0 && hasValidConfig && (
+          <div className="bg-blue-50 border border-blue-300 rounded-lg p-4">
+            <p className="text-blue-800 text-sm">
+              Note: Only Config ISQ was found. No additional relevant Key ISQs were identified from the website data.
             </p>
           </div>
         )}

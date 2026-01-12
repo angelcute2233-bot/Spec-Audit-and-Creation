@@ -4,7 +4,7 @@ import AuditResults from "./components/AuditResults";
 import URLInput from "./components/URLInput";
 import Stage2Results from "./components/Stage2Results";
 import Stage3Results from "./components/Stage3Results";
-import { auditSpecificationsWithGemini, extractISQWithGemini, generateBuyerISQsFromSpecs } from "./utils/api";
+import { auditSpecificationsWithGemini, extractISQWithGemini, generateBuyerISQsFromSpecs, findCommonSpecsWithGemini } from "./utils/api";
 import { generateAuditExcel, generateCombinedExcel } from "./utils/excel";
 import type { AuditInput as AuditInputType, AuditResult, UploadedSpec, ISQ, InputData } from "./types";
 import { Download, RefreshCw } from "lucide-react";
@@ -18,6 +18,7 @@ function App() {
   const [auditResults, setAuditResults] = useState<AuditResult[]>([]);
   const [urls, setUrls] = useState<string[]>([]);
   const [isqs, setIsqs] = useState<{ config: ISQ; keys: ISQ[]; buyers: ISQ[] } | null>(null);
+  const [commonSpecs, setCommonSpecs] = useState<Array<{ spec_name: string; options: string[]; category: string }>>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState<"stage1" | "stage2" | "stage3">("stage1");
@@ -62,6 +63,18 @@ function App() {
       };
 
       const result = await extractISQWithGemini(inputData, submittedUrls);
+
+      console.log("🎯 Finding common specs with Gemini...");
+      setProcessingStage("Finding common specifications...");
+
+      const commonSpecsResult = await findCommonSpecsWithGemini(originalSpecs, {
+        config: result.config,
+        keys: result.keys,
+        buyers: []
+      });
+
+      console.log("✅ Common specs found:", commonSpecsResult.commonSpecs);
+      setCommonSpecs(commonSpecsResult.commonSpecs);
 
       console.log("🎯 Generating buyer ISQs from common specs...");
       setProcessingStage("Generating buyer ISQs...");
@@ -108,6 +121,18 @@ function App() {
 
       const result = await extractISQWithGemini(inputData, urls);
 
+      console.log("🎯 Finding common specs with Gemini...");
+      setProcessingStage("Finding common specifications...");
+
+      const commonSpecsResult = await findCommonSpecsWithGemini(originalSpecs, {
+        config: result.config,
+        keys: result.keys,
+        buyers: []
+      });
+
+      console.log("✅ Common specs found:", commonSpecsResult.commonSpecs);
+      setCommonSpecs(commonSpecsResult.commonSpecs);
+
       console.log("🎯 Regenerating buyer ISQs from common specs...");
       setProcessingStage("Generating buyer ISQs...");
 
@@ -139,6 +164,7 @@ function App() {
     setAuditResults([]);
     setUrls([]);
     setIsqs(null);
+    setCommonSpecs([]);
     setError("");
     setActiveTab("stage1");
   };
@@ -329,44 +355,8 @@ function App() {
               {activeTab === "stage3" && isqs && (
                 <div>
                   <Stage3Results
-                    stage1Data={{
-                      seller_specs: [
-                        {
-                          pmcat_name: mcatName,
-                          pmcat_id: "",
-                          mcats: [
-                            {
-                              category_name: mcatName,
-                              mcat_id: "",
-                              finalized_specs: {
-                                finalized_primary_specs: {
-                                  specs: originalSpecs.filter(s => s.tier === 'Primary' || !s.tier).map(s => ({
-                                    spec_name: s.spec_name,
-                                    options: s.options,
-                                    input_type: s.input_type || 'text' as 'radio_button' | 'multi_select',
-                                    affix_flag: 'None' as 'None' | 'Prefix' | 'Suffix',
-                                    affix_presence_flag: '0' as '0' | '1'
-                                  }))
-                                },
-                                finalized_secondary_specs: {
-                                  specs: originalSpecs.filter(s => s.tier === 'Secondary').map(s => ({
-                                    spec_name: s.spec_name,
-                                    options: s.options,
-                                    input_type: s.input_type || 'text' as 'radio_button' | 'multi_select',
-                                    affix_flag: 'None' as 'None' | 'Prefix' | 'Suffix',
-                                    affix_presence_flag: '0' as '0' | '1'
-                                  }))
-                                },
-                                finalized_tertiary_specs: {
-                                  specs: []
-                                }
-                              }
-                            }
-                          ]
-                        }
-                      ]
-                    }}
-                    isqs={isqs}
+                    commonSpecs={commonSpecs}
+                    buyerISQs={isqs.buyers}
                   />
 
                   <div className="pt-8 border-t border-gray-200 space-y-4">
