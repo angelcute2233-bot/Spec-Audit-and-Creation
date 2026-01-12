@@ -1435,7 +1435,7 @@ async function findCommonSpecsWithGeminiAPI(
     stage2All.push(...stage2ISQs.buyers.filter(b => b.name && b.options?.length > 0));
   }
 
-  const prompt = `You are an AI that finds COMMON specifications between two data sources.
+  const prompt = `You are an AI that finds COMMON specifications and common options between two data sources.
 
 STAGE 1 SPECIFICATIONS (from uploaded data):
 ${stage1Specs.map((s, i) => `${i + 1}. ${s.spec_name} (${s.tier || 'Unknown'})
@@ -1447,7 +1447,7 @@ ${stage2All.map((s, i) => `${i + 1}. ${s.name}
 
 IMPORTANT INSTRUCTIONS:
 1. Find ALL specifications that exist in BOTH Stage 1 and Stage 2
-2. DO NOT assume that names like "Grade", "Quality" and "Standard" are the same. All these three specifications are different.
+2. DO NOT assume that names like "Grade", "Quality" and "Standard" are the same. All these three specifications are different. 
 3. For each common specification:
    - Use the EXACT "spec_name" from Stage 1
    - Use the category from Stage 1 (Primary/Secondary)
