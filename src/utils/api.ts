@@ -1664,7 +1664,7 @@ export async function generateBuyerISQsWithGemini(
 
     if (commonOptions.length >= 8) {
       console.log(`   Already have 8+ common options, using first 8`);
-      const finalOptions = deduplicateOptions(commonOptions).slice(0, 8);
+      const finalOptions = cleanBuyerISQOptions(commonOptions).slice(0, 8);
       buyerISQs.push({
         name: commonSpec.spec_name,
         options: finalOptions
