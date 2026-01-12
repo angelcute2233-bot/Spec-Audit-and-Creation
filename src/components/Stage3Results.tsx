@@ -120,7 +120,7 @@ export default function Stage3Results({ commonSpecs, buyerISQs }: Stage3ResultsP
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-amber-200 bg-amber-100">
-                        <th className="px-4 py-3 text-left font-semibold text-amber-900">#</th>
+                        <th className="px-4 py-3 text-left font-semibold text-amber-900">Rank</th>
                         <th className="px-4 py-3 text-left font-semibold text-amber-900">Specification</th>
                         <th className="px-4 py-3 text-left font-semibold text-amber-900">Options</th>
                       </tr>
