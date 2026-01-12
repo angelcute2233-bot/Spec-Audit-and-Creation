@@ -17,7 +17,7 @@ export default function Stage2Results({ isqs }: Stage2ResultsProps) {
     <div>
       <h2 className="text-2xl font-bold text-gray-900 mb-2">Stage 2: Website ISQ Extraction</h2>
       <p className="text-gray-600 mb-6">
-        Extracted {hasValidConfig ? '1' : '0'} Config ISQ and {displayKeys.length} relevant Key ISQ{displayKeys.length !== 1 ? 's' : ''} websites
+        Extracted {hasValidConfig ? '1' : '0'} Config ISQ and {displayKeys.length} relevant Key ISQ{displayKeys.length !== 1 ? 's' : ''} from websites
       </p>
 
       <div className="space-y-6">
