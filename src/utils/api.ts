@@ -1447,7 +1447,8 @@ ${stage2All.map((s, i) => `${i + 1}. ${s.name}
 
 IMPORTANT INSTRUCTIONS:
 1. Find ALL specifications that exist in BOTH Stage 1 and Stage 2
-2. For each common specification:
+2. DO NOT assume that names like "Grade" and "Standard" are the same
+3. For each common specification:
    - Use the EXACT "spec_name" from Stage 1
    - Use the category from Stage 1 (Primary/Secondary)
    - Find ALL common options between the two stages
