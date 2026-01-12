@@ -789,7 +789,103 @@ async function fetchURL(url: string): Promise<string> {
   return "";
 }
 
-// UPDATED: extractISQWithGemini - NO default fallback, only extraction
+function parseISQFromText(text: string): { config: ISQ; keys: ISQ[] } | null {
+  console.log("🔍 Parsing ISQ from text...");
+
+  try {
+    const result: { config: ISQ; keys: ISQ[] } = {
+      config: { name: "", options: [] },
+      keys: []
+    };
+
+    const configMatch = text.match(/===\s*CONFIG SPECIFICATION\s*===\s*\n\s*Name:\s*(.+?)\s*\n\s*Options:\s*(.+?)(?=\n|$)/is);
+
+    if (configMatch) {
+      const configName = configMatch[1].trim();
+      const configOptionsStr = configMatch[2].trim();
+      const configOptions = configOptionsStr
+        .split(/\s*\|\s*/)
+        .map(opt => opt.trim())
+        .filter(opt => opt.length > 0 && opt.toLowerCase() !== 'other' && opt.toLowerCase() !== 'etc')
+        .slice(0, 8);
+
+      result.config = {
+        name: configName,
+        options: configOptions
+      };
+
+      console.log(`✅ Config parsed: ${configName} with ${configOptions.length} options`);
+    } else {
+      console.warn("⚠️ No config specification found");
+      return null;
+    }
+
+    for (let i = 1; i <= 3; i++) {
+      const keyPattern = new RegExp(`===\\s*KEY SPECIFICATION ${i}\\s*===\\s*\\n\\s*Name:\\s*(.+?)\\s*\\n\\s*Options:\\s*(.+?)(?=\\n===|\\n\\n|$)`, 'is');
+      const keyMatch = text.match(keyPattern);
+
+      if (keyMatch) {
+        const keyName = keyMatch[1].trim();
+        const keyOptionsStr = keyMatch[2].trim();
+        const keyOptions = keyOptionsStr
+          .split(/\s*\|\s*/)
+          .map(opt => opt.trim())
+          .filter(opt => opt.length > 0 && opt.toLowerCase() !== 'other' && opt.toLowerCase() !== 'etc')
+          .slice(0, 6);
+
+        if (keyName && keyOptions.length > 0) {
+          result.keys.push({
+            name: keyName,
+            options: keyOptions
+          });
+          console.log(`✅ Key ${i} parsed: ${keyName} with ${keyOptions.length} options`);
+        }
+      } else {
+        console.warn(`⚠️ Key specification ${i} not found`);
+      }
+    }
+
+    if (result.keys.length < 3) {
+      console.warn(`⚠️ Expected 3 key specifications, found ${result.keys.length}`);
+
+      const fallbackPattern = /Name:\s*(.+?)\s*\n\s*Options:\s*(.+?)(?=\n\s*Name:|$)/gis;
+      const allMatches = [...text.matchAll(fallbackPattern)];
+
+      if (allMatches.length > 1) {
+        for (let i = 1; i < Math.min(4, allMatches.length); i++) {
+          if (result.keys.length >= 3) break;
+
+          const match = allMatches[i];
+          const name = match[1].trim();
+          const optionsStr = match[2].trim();
+          const options = optionsStr
+            .split(/\s*\|\s*/)
+            .map(opt => opt.trim())
+            .filter(opt => opt.length > 0 && opt.toLowerCase() !== 'other')
+            .slice(0, 6);
+
+          if (name && options.length > 0 && !result.keys.some(k => k.name === name)) {
+            result.keys.push({ name, options });
+            console.log(`✅ Fallback key ${result.keys.length} parsed: ${name}`);
+          }
+        }
+      }
+    }
+
+    if (result.config.name && result.config.options.length > 0 && result.keys.length >= 3) {
+      console.log(`🎉 Successfully parsed: 1 config + ${result.keys.length} keys`);
+      return result;
+    } else {
+      console.warn(`⚠️ Incomplete parsing: config=${result.config.name ? 'yes' : 'no'}, keys=${result.keys.length}`);
+      return result.config.name && result.keys.length > 0 ? result : null;
+    }
+
+  } catch (error) {
+    console.error("❌ Error parsing ISQ text:", error);
+    return null;
+  }
+}
+
 export async function extractISQWithGemini(
   input: InputData,
   urls: string[]
@@ -801,11 +897,10 @@ export async function extractISQWithGemini(
   console.log("🚀 Stage 2: Starting ISQ extraction");
   console.log(`📋 Product: ${input.mcats.map(m => m.mcat_name).join(', ')}`);
   console.log(`🔗 URLs to process: ${urls.length}`);
-  
+
   await sleep(2000);
 
   try {
-    // Fetch URLs
     console.log("🌐 Fetching URL contents...");
     const urlContentsPromises = urls.map(async (url, index) => {
       console.log(`  📡 [${index + 1}/${urls.length}] Fetching: ${url}`);
@@ -814,19 +909,19 @@ export async function extractISQWithGemini(
     });
 
     const results = await Promise.all(urlContentsPromises);
-    
+
     const urlContents: string[] = [];
     const successfulFetches: number[] = [];
-    
+
     results.forEach(result => {
       urlContents.push(result.content);
       if (result.content && result.content.length > 0) {
         successfulFetches.push(result.index + 1);
       }
     });
-    
+
     console.log(`📊 Fetch results: ${successfulFetches.length}/${urls.length} successful`);
-    
+
     if (successfulFetches.length === 0) {
       console.warn("⚠️ No content fetched");
       return {
@@ -835,12 +930,11 @@ export async function extractISQWithGemini(
         buyers: []
       };
     }
-    
-    // Build prompt
+
     const prompt = buildISQExtractionPrompt(input, urls, urlContents);
-    
+
     console.log("🤖 Calling Gemini API...");
-    
+
     const response = await fetchWithRetry(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${STAGE2_API_KEY}`,
       {
@@ -861,7 +955,7 @@ export async function extractISQWithGemini(
           generationConfig: {
             temperature: 0.3,
             maxOutputTokens: 4000,
-            responseMimeType: "application/json"
+            responseMimeType: "text/plain"
           },
         }),
       },
@@ -871,10 +965,13 @@ export async function extractISQWithGemini(
 
     const data = await response.json();
     console.log("✅ Gemini API response received");
-    
-    let parsed = extractJSONFromGemini(data);
 
-    // If no valid result, return empty
+    const textResponse = extractRawText(data);
+    console.log("📝 Raw text response (first 800 chars):");
+    console.log(textResponse.substring(0, 800));
+
+    const parsed = parseISQFromText(textResponse);
+
     if (!parsed || !parsed.config || !parsed.config.name || parsed.config.options.length === 0) {
       console.warn("⚠️ No valid data extracted from Gemini");
       return {
@@ -883,16 +980,16 @@ export async function extractISQWithGemini(
         buyers: []
       };
     }
-    
+
     console.log(`🎉 Success! Config: ${parsed.config.name} with ${parsed.config.options.length} options`);
     console.log(`🔑 Keys: ${parsed.keys?.length || 0}`);
-    
+
     return {
       config: parsed.config,
       keys: parsed.keys || [],
       buyers: parsed.buyers || []
     };
-    
+
   } catch (error) {
     console.error("❌ Stage 2 API error:", error);
     return {
@@ -912,116 +1009,69 @@ function buildISQExtractionPrompt(
     .map((url, i) => `URL ${i + 1}: ${url}\nContent: ${contents[i].substring(0, 1000)}...`)
     .join("\n\n");
 
-  return `You are an AI that extracts product specifications from multiple URLs. 
-Your task is to identify the most important specifications and their options accurately. 
+  return `You are an AI that extracts product specifications from multiple URLs.
+Your task is to identify the most important specifications and their options accurately.
 
 Extract specifications from these URLs for: ${input.mcats.map((m) => m.mcat_name).join(", ")}
 
 URLs:
 ${urlsText}
 
-INSTRUCTIONS (Step by Step):
+INSTRUCTIONS:
 
-1. **Extract all visible specifications from all URLs**, including:
-   - Technical tables
-   - Description sections
-   - Variant details
-   - Size charts
-   - Grade sheets
-   - Material information
-   - Any repeated fields
-   - Content inside tabs or expandable sections
+1. Extract all visible specifications from all URLs
+2. Combine equivalent specifications and options
+3. Select exactly 1 CONFIG specification (highest frequency, most price-affecting)
+4. Select exactly 3 KEY specifications (next highest frequency)
+5. Show maximum 8 options per specification
+6. Do NOT include specifications already in the MCAT name
+7. Do NOT include "Other" or "etc." options
 
-2. **Combine equivalent specifications and options**:
-   - Merge equivalent specifications, e.g., "Material Grade", "Grade", "SS 304", "304" → "Grade" 
-   - Merge options that mean the same, e.g., "304L" and "SS 304L" → "SS 304L" 
-   - Count the frequency of each specification and option after combining
+OUTPUT FORMAT (STRICT TEXT TABLE):
 
-3. **Select Config and Key specifications based on frequency**:
-   - **Config specification**: the specification with the highest frequency. Most important specification affecting price across similar products. Example: RAM Capacity of smartphones.
-   - **Key specifications**: the next top 3 specifications with highest frequency define the product and differentiate it from similar products. Example: Front-loading vs Top-loading for washing machines.
-   - Options must be the ones most repeated across all URLs.
-   - Do NOT repeat specifications or options in output.
-   - Specifications must be **selected and ordered strictly by frequency (highest first)**.
-   - Options must be **selected and ordered by frequency (highest first)**.
-   - Show **maximum 8 options per specification**, based on highest frequency.
-   - Do NOT include placeholder options like "Other" or "etc."
+You must output EXACTLY in this format with clear section markers:
 
+=== CONFIG SPECIFICATION ===
+Name: [specification name]
+Options: [option 1] | [option 2] | [option 3] | [option 4] | [option 5] | [option 6] | [option 7] | [option 8]
 
-**Example:**  
-Suppose 3 URLs have the following data:  
-**Specification: "Grade"**
+=== KEY SPECIFICATION 1 ===
+Name: [specification name]
+Options: [option 1] | [option 2] | [option 3] | [option 4] | [option 5] | [option 6]
 
-- URL1 options: ["SS 304", "SS 316"]  
-- URL2 options: ["304", "SS 316"]  
-- URL3 options: ["SS 304", "SS 316L"]  
+=== KEY SPECIFICATION 2 ===
+Name: [specification name]
+Options: [option 1] | [option 2] | [option 3] | [option 4] | [option 5]
 
-**Step 1: Merge equivalent options**  
-- "SS 304" and "304" → "SS 304"  
-- Keep "SS 316" and "SS 316L" as-is  
+=== KEY SPECIFICATION 3 ===
+Name: [specification name]
+Options: [option 1] | [option 2] | [option 3] | [option 4]
 
-**Step 2: Count frequency**  
-Options frequency:  
-- "SS 304" → 2  
-- "SS 316" → 2  
-- "SS 316L" → 1  
+EXAMPLE OUTPUT:
 
-**Step 3: Choose top options**  
-- Pick "SS 304" and "SS 316" (most frequent)  
-- Exclude "SS 316L" (less frequent)  
+=== CONFIG SPECIFICATION ===
+Name: Grade
+Options: SS 304 | SS 316 | SS 316L | SS 430 | MS | Galvanized
 
-**Step 4: Choose specification frequency**  
-- "Grade" appears in all URLs → becomes Config specification
+=== KEY SPECIFICATION 1 ===
+Name: Thickness
+Options: 0.5 mm | 1 mm | 1.5 mm | 2 mm | 3 mm | 5 mm
 
-4. **Handle ranges**:
-   - If a specification has ranges across URLs, find the overlapping range. Example:
-     - Thickness 0.3–6 mm, 0.1–5 mm, 0.25–5 mm → Output range: 0.3–5 mm
-   - Do NOT create options outside the URL-provided data.
+=== KEY SPECIFICATION 2 ===
+Name: Surface Finish
+Options: Hot Rolled | Cold Rolled | Polished | Matte
 
-5. **Exclusions**:
-   - Do NOT include specifications already mentioned in the MCAT Name. Example:
-     - MCAT Name: "Mild Steel Hot Rolled Sheet"
-       - "Mild Steel" → Material → EXCLUDE
-       - "Hot Rolled" → Finish → EXCLUDE
-     - MCAT Name: "Stainless Steel 304 Pipe"
-       - "Stainless Steel" → Material → EXCLUDE
-       - "304" → Grade → EXCLUDE
+=== KEY SPECIFICATION 3 ===
+Name: Width
+Options: 1000 mm | 1219 mm | 1500 mm | 2000 mm
 
-6. **Rules**:
-   - Do NOT invent specifications or options
-   - Use frequency as the main criteria for importance
-   - Ensure at least one Config and 3 Key specifications are returned
-   - Options must come from URLs; no guessing
-   - Do NOT repeat any specification or option
-   - Do NOT include placeholder options like "Other", "etc.", or similar
-
-7. **Output Format**:
-   - Return ONLY valid JSON
-   - No explanations, no markdown, no text outside JSON
-   - JSON must start with { and end with }
-   - Do not return incomplete JSON. Complete all strings and arrays.
-   - Example JSON:
-
-{
-"config": {
-"name": "Grade",
-"options": ["SS 304", "SS 316"]
-},
-"keys": [
-{
-"name": "Thickness",
-"options": ["0.3 mm to 5 mm"]
-},
-{
-"name": "Width",
-"options": ["100 mm", "200 mm", "300 mm"]
-},
-{
-"name": "Surface Finish",
-"options": ["Polished", "Matte"]
-}
-]
-}
+CRITICAL RULES:
+- Use section markers EXACTLY as shown: === CONFIG SPECIFICATION ===, === KEY SPECIFICATION 1 ===, etc.
+- Output EXACTLY 1 config and EXACTLY 3 key specifications
+- Separate options with pipe character " | "
+- No explanations, no extra text
+- If fewer than 8 options exist, that's fine
+- Base everything on URL data, no guessing
 `;
 }
 

@@ -10,51 +10,87 @@ interface Stage2ResultsProps {
 }
 
 export default function Stage2Results({ isqs }: Stage2ResultsProps) {
+  const displayKeys = isqs.keys.slice(0, 3);
+  const hasValidConfig = isqs.config && isqs.config.name && isqs.config.options.length > 0;
+
   return (
     <div>
-      <h2 className="text-2xl font-bold text-gray-900 mb-2">Stage 2: ISQ Extraction Complete</h2>
-      <p className="text-gray-600 mb-8">Review the extracted ISQs below</p>
+      <h2 className="text-2xl font-bold text-gray-900 mb-2">Stage 2: Website ISQ Extraction</h2>
+      <p className="text-gray-600 mb-6">
+        Extracted {hasValidConfig ? '1' : '0'} Config ISQ and {displayKeys.length} Key ISQ{displayKeys.length !== 1 ? 's' : ''} from competitor websites
+      </p>
 
-      <div className="space-y-8">
-
-        {/* Config ISQ */}
-        <div className="mb-8">
-          <div className="bg-red-50 border-l-4 border-red-500 p-6 rounded-lg">
-            <h2 className="text-2xl font-bold text-red-900 mb-4">Config ISQ</h2>
-            <div className="mb-4">
-              <p className="font-semibold text-lg text-gray-900">{isqs.config.name}</p>
-              <p className="text-sm text-gray-600 mt-1">Influences pricing and primary product variation</p>
+      <div className="space-y-6">
+        {hasValidConfig ? (
+          <div className="bg-gradient-to-r from-red-50 to-orange-50 border-2 border-red-400 rounded-lg p-6 shadow-sm">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-xl font-bold text-red-900">Config ISQ</h3>
+                <p className="text-sm text-red-700 mt-1">Most important specification affecting price and product variation</p>
+              </div>
+              <div className="bg-red-500 text-white px-4 py-2 rounded-full font-bold text-sm">
+                {isqs.config.options.length} options
+              </div>
+            </div>
+            <div className="mb-3">
+              <p className="font-bold text-lg text-gray-900">{isqs.config.name}</p>
             </div>
             <div className="flex flex-wrap gap-2">
               {isqs.config.options.map((option, idx) => (
-                <span key={idx} className="bg-red-200 text-red-800 px-4 py-2 rounded-full font-medium">
+                <span key={idx} className="bg-red-200 text-red-900 px-4 py-2 rounded-full font-semibold border border-red-400">
                   {option}
                 </span>
               ))}
             </div>
           </div>
-        </div>
-
-        {/* Key ISQs */}
-        <div className="mb-8">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">Key ISQs (3)</h2>
-          <div className="grid gap-4">
-            {isqs.keys.map((isq, idx) => (
-              <div key={idx} className="bg-blue-50 border-l-4 border-blue-500 p-6 rounded-lg">
-                <p className="font-semibold text-lg text-gray-900 mb-3">
-                  {idx + 1}. {isq.name}
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {isq.options.map((option, oIdx) => (
-                    <span key={oIdx} className="bg-blue-200 text-blue-800 px-3 py-1 rounded-full text-sm">
-                      {option}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            ))}
+        ) : (
+          <div className="bg-yellow-50 border-2 border-yellow-400 rounded-lg p-6">
+            <p className="text-yellow-800 font-semibold">No Config ISQ extracted</p>
+            <p className="text-yellow-700 text-sm mt-1">The extraction did not identify a primary configuration specification</p>
           </div>
-        </div>
+        )}
+
+        {displayKeys.length > 0 ? (
+          <div>
+            <h3 className="text-xl font-bold text-gray-900 mb-4">
+              Key ISQs ({displayKeys.length})
+            </h3>
+            <div className="grid gap-4">
+              {displayKeys.map((isq, idx) => (
+                <div key={idx} className="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-400 rounded-lg p-6 shadow-sm">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="font-bold text-lg text-gray-900">
+                      {idx + 1}. {isq.name}
+                    </p>
+                    <div className="bg-blue-500 text-white px-3 py-1 rounded-full font-bold text-sm">
+                      {isq.options.length} options
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {isq.options.map((option, oIdx) => (
+                      <span key={oIdx} className="bg-blue-200 text-blue-900 px-3 py-1.5 rounded-full font-medium border border-blue-400">
+                        {option}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="bg-yellow-50 border-2 border-yellow-400 rounded-lg p-6">
+            <p className="text-yellow-800 font-semibold">No Key ISQs extracted</p>
+            <p className="text-yellow-700 text-sm mt-1">The extraction did not identify key specifications</p>
+          </div>
+        )}
+
+        {displayKeys.length < 3 && displayKeys.length > 0 && (
+          <div className="bg-blue-50 border border-blue-300 rounded-lg p-4">
+            <p className="text-blue-800 text-sm">
+              Note: Expected 3 Key ISQs, but only {displayKeys.length} {displayKeys.length === 1 ? 'was' : 'were'} extracted from the URLs.
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );
