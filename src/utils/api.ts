@@ -1023,9 +1023,10 @@ INSTRUCTIONS:
 2. Combine equivalent specifications and options
 3. Select exactly 1 CONFIG specification (highest frequency, most price-affecting)
 4. Select exactly 3 KEY specifications (next highest frequency)
-5. Show maximum 8 options per specification
-6. Do NOT include specifications already in the MCAT name
-7. Do NOT include "Other" or "etc." options
+4. Options must be the ones most repeated across all URLs.
+6. Show maximum 8 options per specification
+7. Do NOT include specifications already in the MCAT name
+8. Do NOT include "Other" or "etc." options
 
 OUTPUT FORMAT (STRICT TEXT TABLE):
 
