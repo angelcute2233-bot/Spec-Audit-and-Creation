@@ -1714,6 +1714,73 @@ function deduplicateOptions(options: string[]): string[] {
   return uniqueOptions;
 }
 
+function cleanBuyerISQOptions(options: string[]): string[] {
+  const invalidPatterns = [
+    'other',
+    'others', 
+    'various',
+    'etc',
+    'etc.',
+    'and more',
+    'miscellaneous',
+    'misc',
+    'other options',
+    'other values',
+    'additional',
+    'extra',
+    'custom',
+    'specify',
+    'please specify',
+    'enter value',
+    'fill in',
+    'input required',
+    'user defined',
+    'customer defined',
+    'user input',
+    'input here',
+    'to be specified',
+    'tbd',
+    't.b.d.',
+    'to be determined',
+    'to be decided',
+    'select',
+    'choose',
+    'pick',
+    'option',
+    'options'
+  ];
+
+  const uniqueOptions: string[] = [];
+  const seenOptions = new Set<string>();
+
+  for (const opt of options) {
+    const cleanOpt = opt.trim();
+    if (cleanOpt.length === 0) continue;
+    
+    const optLower = cleanOpt.toLowerCase();
+    
+    // Check if it's an invalid option
+    const isInvalid = invalidPatterns.some(pattern => 
+      optLower === pattern || 
+      optLower.startsWith(pattern + ' ') ||
+      optLower.endsWith(' ' + pattern) ||
+      optLower.includes(' ' + pattern + ' ')
+    );
+    
+    if (isInvalid) {
+      console.log(`   🗑️ Removing invalid option: "${opt}"`);
+      continue;
+    }
+    
+    // Check if it's a duplicate
+    if (!seenOptions.has(optLower) && !isOptionDuplicate(opt, uniqueOptions)) {
+      uniqueOptions.push(cleanOpt);
+      seenOptions.add(optLower);
+    }
+  }
+
+  return uniqueOptions;
+}
 async function enhanceOptionsWithGemini(
   specName: string,
   commonOptions: string[],
