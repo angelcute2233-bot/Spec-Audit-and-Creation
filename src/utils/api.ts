@@ -1057,6 +1057,15 @@ CRITICAL RELEVANCE RULES:
 4. DO NOT include "Other" or "etc." or "N/A" options
 5. ONLY include specs that appear multiple times across URLs
 
+IMPORTANT RANGE HANDLING RULES:
+1. If you find overlapping ranges (e.g., "0.14-2.00 mm" and "0.25-2.00 mm"), 
+   keep only the WIDER range ("0.14-2.00 mm")
+2. If a smaller range is COMPLETELY within a larger range, use ONLY the larger range
+3. For thickness/ranges, merge overlapping ranges
+4. Example: "0.14-2.00 mm" and "0.25-2.00 mm" → keep "0.14-2.00 mm"
+5. Remove redundant ranges that are subsets of other ranges
+6. DO NOT use "Range" as a specification name. Use the actual specification name like "Thickness", "Diameter", etc.
+
 INSTRUCTIONS:
 1. Extract all RELEVANT specifications from all URLs
 2. Combine equivalent specifications and options
