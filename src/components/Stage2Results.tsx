@@ -59,9 +59,6 @@ export default function Stage2Results({ isqs }: Stage2ResultsProps) {
                     <p className="font-bold text-lg text-gray-900">
                       {idx + 1}. {isq.name}
                     </p>
-                    <div className="bg-blue-500 text-white px-3 py-1 rounded-full font-bold text-sm">
-                      {isq.options.length} options
-                    </div>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {isq.options.map((option, oIdx) => (
