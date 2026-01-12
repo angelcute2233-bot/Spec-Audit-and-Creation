@@ -36,9 +36,6 @@ export default function Stage3Results({ commonSpecs, buyerISQs }: Stage3ResultsP
               </span>
               Common Specifications
             </h3>
-            <div className="text-sm text-blue-700 font-medium">
-              {primaryCommonSpecs.length} Primary, {secondaryCommonSpecs.length} Secondary
-            </div>
           </div>
           <p className="text-sm text-blue-700 mb-6">
             Specifications that appear in both Stage 1 & Stage 2
