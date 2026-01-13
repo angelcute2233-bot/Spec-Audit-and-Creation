@@ -1074,6 +1074,7 @@ INSTRUCTIONS:
 5. Options must be the ones most repeated across URLs
 6. Maximum 8 options per specification
 7. If you cannot find enough relevant specs, output what you find (don't make up specs)
+8. Try to find 2 specifications atleast
 
 OUTPUT FORMAT:
 
