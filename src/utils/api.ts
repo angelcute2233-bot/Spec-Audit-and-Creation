@@ -1464,6 +1464,7 @@ IMPORTANT INSTRUCTIONS:
    - If NO common options, show empty options list
    - If one stage has options **range** (e.g., "1-5 mm") and the other stage has **discrete numbers** (e.g., "1 mm, 2 mm, 3 mm"), treat all discrete numbers that fall within the range as common options
    - You MUST return the common options in format **exactly as it appears in the Stage 1 list**
+4. EVEN IF a common spec has ZERO common options, it MUST still be listed with an empty options column
 
 CRITICAL RANGE HANDLING FOR COMMON OPTIONS:
 1. If Stage 2 has a RANGE (e.g., "0.14-2.00 mm") and Stage 1 has SPECIFIC NUMBERS (e.g., "0.5 mm", "1.0 mm", "1.5 mm"):
