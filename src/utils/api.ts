@@ -1503,8 +1503,9 @@ CRITICAL:
 2. Each line represents ONE specification
 3. Use pipe (|) to separate columns
 4. EVEN IF a common spec has ZERO common options, it MUST still be listed with an empty options column
-5. List common options separated by commas
-6. NO JSON, NO MARKDOWN, JUST PLAIN TEXT TABLE`;
+5. If NO common specs found, return: {"common_specs": []}
+6. List common options separated by commas
+7. NO JSON, NO MARKDOWN, JUST PLAIN TEXT TABLE`;
 
   try {
     console.log("📡 Calling Gemini API for common specs...");
