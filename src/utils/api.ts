@@ -1500,7 +1500,7 @@ CRITICAL:
 1. Return ALL common specs found in both stages
 2. Each line represents ONE specification
 3. Use pipe (|) to separate columns
-4. If no common options, leave that column empty
+4. EVEN IF a common spec has ZERO common options, it MUST still be listed with an empty options column
 5. List common options separated by commas
 6. NO JSON, NO MARKDOWN, JUST PLAIN TEXT TABLE`;
 
