@@ -93,9 +93,6 @@ export default function Stage3Results({ commonSpecs, buyerISQs }: Stage3ResultsP
         <div className="bg-gradient-to-br from-amber-50 to-orange-50 border-2 border-amber-300 rounded-lg p-6">
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-xl font-semibold text-amber-900 flex items-center gap-2">
-              <span className="inline-block w-10 h-10 bg-amber-300 rounded-full flex items-center justify-center text-amber-900 text-lg font-bold">
-                {buyerISQs.length}
-              </span>
               Buyer ISQs
             </h3>
           </div>
